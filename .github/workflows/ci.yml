@@ -12,7 +12,7 @@ on:
       - '!.gitignore'
 
 jobs:
-  build_pull_request:
+  build_commit:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
