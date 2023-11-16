@@ -73,10 +73,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
 
-      - name: Build Debug APK
+      - name: Build Release APK
         run: |
-          ./gradlew :app:assembleDebug
-          ./gradlew :assembleDebugPlugins
+          #./gradlew :app:assembleDebug
+          #./gradlew :assembleDebugPlugins
+
+          ./gradlew :build-logic:convention:publish
+          ./gradlew :lib:common:publish
+          ./gradlew :lib:plugin-base:publish
 
       - name: Upload app
         uses: actions/upload-artifact@v3
