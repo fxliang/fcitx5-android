@@ -21,7 +21,7 @@ jobs:
           #- macos-13
           #- windows-2022
         abi:
-          - armeabi-v7a
+          #- armeabi-v7a
           - arm64-v8a
           #- x86
           #- x86_64
@@ -75,12 +75,12 @@ jobs:
 
       - name: Build Release APK
         run: |
-          #./gradlew :app:assembleDebug
-          #./gradlew :assembleDebugPlugins
+          ./gradlew :app:assembleDebug
+          ./gradlew :assembleDebugPlugins
 
-          ./gradlew :build-logic:convention:publish
-          ./gradlew :lib:common:publish
-          ./gradlew :lib:plugin-base:publish
+          #./gradlew :build-logic:convention:publish
+          #./gradlew :lib:common:publish
+          #./gradlew :lib:plugin-base:publish
 
       - name: Upload app
         uses: actions/upload-artifact@v3
