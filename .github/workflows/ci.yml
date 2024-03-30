@@ -59,16 +59,16 @@ jobs:
           sudo apt update
           sudo apt install extra-cmake-modules gettext
 
-      - name: Install system dependencies (macOS)
-        if: ${{ matrix.os == 'macos-13' }}
-        run: |
-          brew install extra-cmake-modules
+      #- name: Install system dependencies (macOS)
+      #  if: ${{ matrix.os == 'macos-13' }}
+      #  run: |
+      #    brew install extra-cmake-modules
 
-      - name: Install system dependencies (Windows)
-        if: ${{ matrix.os == 'windows-2022' }}
-        run: |
-          C:/msys64/usr/bin/pacman -S --noconfirm mingw-w64-ucrt-x86_64-gettext mingw-w64-ucrt-x86_64-extra-cmake-modules
-          Add-Content $env:GITHUB_PATH "C:/msys64/ucrt64/bin"
+      #- name: Install system dependencies (Windows)
+      #  if: ${{ matrix.os == 'windows-2022' }}
+      #  run: |
+      #    C:/msys64/usr/bin/pacman -S --noconfirm mingw-w64-ucrt-x86_64-gettext mingw-w64-ucrt-x86_64-extra-cmake-modules
+      #    Add-Content $env:GITHUB_PATH "C:/msys64/ucrt64/bin"
 
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
@@ -80,6 +80,7 @@ jobs:
       
       # move plugin apks to app/build/outputs/apk/release
       - name: Move plugin APKs
+        shell: bash
         run: |
           for i in $(ls plugin)
           do
@@ -103,8 +104,15 @@ jobs:
           BUILD_TOOLS_VERSION: "31.0.0"
 
       - name: Delete unsigned APKs
+        shell: bash
         run: |
           rm app/build/outputs/apk/release/*unsigned.apk
+          pushd app/build/outputs/apk/release
+          for file in *unsigned-*; do
+            new_name="${file/unsigned-/}"
+            mv -- "$file" "$new_name"
+          done
+          popd
 
       - name: Upload app with plugins
         uses: actions/upload-artifact@v3

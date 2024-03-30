@@ -16,7 +16,7 @@ find_package(Fcitx5Module MODULE)
 
 set(PREBUILT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../lib/fcitx5/src/main/cpp/prebuilt")
 
-set(Rime_VERSION "1.9.0")
+set(Rime_VERSION "1.11.0")
 set(Rime_dependencies
         "${PREBUILT_DIR}/boost/${ANDROID_ABI}/lib/libboost_filesystem.a"
         log # glog links to android log
@@ -34,7 +34,7 @@ set_target_properties(Rime_static PROPERTIES
         INTERFACE_LINK_LIBRARIES "${Rime_dependencies}"
         )
 
-# https://github.com/rime/librime/blob/1.9.0/src/rime_api.h#L663
+# https://github.com/rime/librime/blob/1.11.0/src/rime_api.h#L692
 # https://stackoverflow.com/questions/805555/ld-linker-question-the-whole-archive-option
 # use $<LINK_LIBRARY:WHOLE_ARCHIVE,Rime_static> when cmake updated to 3.24+
 # https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html#link-features
