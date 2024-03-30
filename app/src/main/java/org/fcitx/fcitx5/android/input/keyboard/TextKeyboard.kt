@@ -60,7 +60,7 @@ class TextKeyboard(
                 AlphabetKey("V", "_"),
                 AlphabetKey("B", ":"),
                 AlphabetKey("N", ";"),
-                AlphabetKey("M", "\\"),
+                AlphabetKey("M", "/"),
                 BackspaceKey()
             ),
             listOf(
