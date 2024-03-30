@@ -3,7 +3,7 @@
 	url = git@github.com:fcitx/fcitx5.git
 [submodule "lib/fcitx5/src/main/cpp/prebuilt"]
 	path = lib/fcitx5/src/main/cpp/prebuilt
-	url = git@github.com:fcitx5-android/prebuilt.git
+	url = git@github.com:wxyzh/prebuilt.git
 [submodule "lib/fcitx5-lua/src/main/cpp/fcitx5-lua"]
 	path = lib/fcitx5-lua/src/main/cpp/fcitx5-lua
 	url = git@github.com:fcitx/fcitx5-lua.git
