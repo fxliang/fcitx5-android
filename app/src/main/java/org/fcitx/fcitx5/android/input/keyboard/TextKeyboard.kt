@@ -153,8 +153,12 @@ class TextKeyboard(
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         space.mainText.text = buildString {
-            append(ime.displayName)
-            ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
+            if (ime.displayName in setOf("中州韵", "Rime")) {
+                append("ㄓ")
+            } else {
+                append(ime.displayName)
+            }
+            ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" $it") }
         }
     }
 
