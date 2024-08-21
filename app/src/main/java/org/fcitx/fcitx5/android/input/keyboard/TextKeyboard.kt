@@ -44,25 +44,25 @@ class TextKeyboard(
                 AlphabetKey("P", "0")
             ),
             listOf(
-                AlphabetKey("A", "@"),
-                AlphabetKey("S", "*"),
-                AlphabetKey("D", "+"),
-                AlphabetKey("F", "-"),
-                AlphabetKey("G", "="),
-                AlphabetKey("H", "/"),
-                AlphabetKey("J", "#"),
+                AlphabetKey("A", "!"),
+                AlphabetKey("S", "@"),
+                AlphabetKey("D", "#"),
+                AlphabetKey("F", "$"),
+                AlphabetKey("G", "%"),
+                AlphabetKey("H", "&"),
+                AlphabetKey("J", "*"),
                 AlphabetKey("K", "("),
                 AlphabetKey("L", ")")
             ),
             listOf(
                 CapsKey(),
                 AlphabetKey("Z", "'"),
-                AlphabetKey("X", ":"),
-                AlphabetKey("C", "\""),
-                AlphabetKey("V", "?"),
-                AlphabetKey("B", "!"),
-                AlphabetKey("N", "~"),
-                AlphabetKey("M", "\\"),
+                AlphabetKey("X", "^"),
+                AlphabetKey("C", "-"),
+                AlphabetKey("V", "_"),
+                AlphabetKey("B", ":"),
+                AlphabetKey("N", ";"),
+                AlphabetKey("M", "/"),
                 BackspaceKey()
             ),
             listOf(
