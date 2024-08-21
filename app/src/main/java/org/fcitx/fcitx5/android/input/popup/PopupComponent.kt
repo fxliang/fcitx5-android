@@ -38,7 +38,7 @@ data class PopupPresetData(val presets: Map<String, Array<String>>)
 
 fun loadPopupPresetFromFile(context: Context, label: String): Array<String>? {
     val dataPath = context.getExternalFilesDir(null)?.absolutePath
-    val filePath = "$dataPath/files/popup_preset.json"
+    val filePath = "$dataPath/popup_preset.json"
     return try {
         val jsonString = File(filePath).readText()
         val popupPresetData = Json.decodeFromString<PopupPresetData>(jsonString)
