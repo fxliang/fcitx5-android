@@ -27,6 +27,26 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.lParams
 import java.util.LinkedList
+import android.content.Context
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import java.io.File
+
+@Serializable
+data class PopupPresetData(val presets: Map<String, Array<String>>)
+
+fun loadPopupPresetFromFile(context: Context, label: String): Array<String>? {
+    val dataPath = context.filesDir.absolutePath
+    val filePath = "$dataPath/popup_preset.json"
+    return try {
+        val jsonString = File(filePath).readText()
+        val popupPresetData = Json.decodeFromString<PopupPresetData>(jsonString)
+        popupPresetData.presets[label]
+    } catch (e: Exception) {
+        null
+    }
+}
 
 class PopupComponent :
     UniqueComponent<PopupComponent>(), Dependent, ManagedHandler by managedHandler() {
@@ -97,7 +117,8 @@ class PopupComponent :
     }
 
     private fun showKeyboard(viewId: Int, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
-        val keys = PopupPreset[keyboard.label] ?: return
+        // val keys = PopupPreset[keyboard.label] ?: return
+        val keys = loadPopupPresetFromFile(context, keyboard.label) ?: PopupPreset[keyboard.label] ?: return
         // clear popup preview text         OR create empty popup preview
         showingEntryUi[viewId]?.setText("") ?: showPopup(viewId, "", bounds)
         reallyShowKeyboard(viewId, keys, bounds)
