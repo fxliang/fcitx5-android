@@ -65,6 +65,33 @@ class PopupComponent :
     private val rootLocation = intArrayOf(0, 0)
     private val rootBounds: Rect = Rect()
 
+    companion object {
+        private val lock = Any()
+        private var lastModified = 0L
+        private var cachedPopupPreset: Map<String, Array<String>>? = null
+        val popupPresetJson: Map<String, Array<String>>?
+            @Synchronized
+            get() {
+                var file = File(appContext.getExternalFilesDir(null), "config/PopupPreset.json")
+                if (!file.exists()) {
+                    cachedPopupPreset = null
+                    return null
+                }
+                if (cachedPopupPreset == null || file.lastModified() != lastModified) {
+                    try {
+                        lastModified = file.lastModified()
+                        val json = file.readText()
+                        cachedPopupPreset = Json.decodeFromString<Map<String, List<String>>>(json)
+                            .mapValues { it.value.toTypedArray() }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        cachedPopupPreset = null
+                    }
+                }
+                return cachedPopupPreset
+            }
+    }
+    /* 
     private val popupPresetJson: Map<String, Array<String>>? by lazy {
         try {
             val file = File(appContext.getExternalFilesDir(null), "config/PopupPreset.json")
@@ -80,6 +107,7 @@ class PopupComponent :
             null
         }
     }
+    */
 
     val root by lazy {
         context.frameLayout {
@@ -126,7 +154,7 @@ class PopupComponent :
     }
 
     private fun showKeyboard(viewId: Int, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
-        val keys = popupPresetJson?.get(keyboard.label) ?: PopupPreset[keyboard.label] ?: return
+        val keys = Companion.popupPresetJson?.get(keyboard.label) ?: PopupPreset[keyboard.label] ?: return
         // clear popup preview text         OR create empty popup preview
         showingEntryUi[viewId]?.setText("") ?: showPopup(viewId, "", bounds)
         reallyShowKeyboard(viewId, keys, bounds)
