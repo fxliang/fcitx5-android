@@ -65,12 +65,13 @@ class PopupComponent :
     private val rootLocation = intArrayOf(0, 0)
     private val rootBounds: Rect = Rect()
 
-    private val popupPresetJson: Map<String, List<String>>? by lazy {
+    private val popupPresetJson: Map<String, Array<String>>? by lazy {
         try {
             val file = File(appContext.getExternalFilesDir(null), "config/PopupPreset.json")
             if (file.exists()) {
                 val json = file.readText()
                 Json.decodeFromString<Map<String, List<String>>>(json)
+                    .mapValues { it.value.toTypedArray() }
             } else {
                 null
             }
@@ -125,9 +126,7 @@ class PopupComponent :
     }
 
     private fun showKeyboard(viewId: Int, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
-        // val keys = PopupPreset[keyboard.label] ?: return
-        val keysFromJson: Array<String>? = popupPresetJson?.get(keyboard.label)?.toTypedArray()
-        val keys = keysFromJson ?: PopupPreset[keyboard.label] ?: return
+        val keys = popupPresetJson?.get(keyboard.label) ?: PopupPreset[keyboard.label] ?: return
         // clear popup preview text         OR create empty popup preview
         showingEntryUi[viewId]?.setText("") ?: showPopup(viewId, "", bounds)
         reallyShowKeyboard(viewId, keys, bounds)
