@@ -18,6 +18,12 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import splitties.views.imageResource
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.fcitx.fcitx5.android.utils.appContext
+import java.io.File
 
 @SuppressLint("ViewConstructor")
 class TextKeyboard(
@@ -28,52 +34,110 @@ class TextKeyboard(
     enum class CapsState { None, Once, Lock }
 
     companion object {
+        private val lock = Any()
+        private var lastModified = 0L
+        private var cachedLayoutPreset: Map<String, Array<String>>? = null
+        val layoutJson: Map<String, Array<String>>?
+            @Synchronized
+            get() {
+                var file = File(appContext.getExternalFilesDir(null), "config/TextKeyboardLayout.json")
+                if (!file.exists()) {
+                    cachedLayoutPreset = null
+                    return null
+                }
+                if (cachedLayoutPreset == null || file.lastModified() != lastModified) {
+                    try {
+                        lastModified = file.lastModified()
+                        val json = file.readText()
+                        cachedLayoutPreset = Json.decodeFromString<Map<String, List<String>>>(json)
+                            .mapValues { it.value.toTypedArray() }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        cachedLayoutPreset = null
+                    }
+                }
+                return cachedLayoutPreset
+            }
+
         const val Name = "Text"
 
-        val Layout: List<List<KeyDef>> = listOf(
-            listOf(
-                AlphabetKey("Q", "1"),
-                AlphabetKey("W", "2"),
-                AlphabetKey("E", "3"),
-                AlphabetKey("R", "4"),
-                AlphabetKey("T", "5"),
-                AlphabetKey("Y", "6"),
-                AlphabetKey("U", "7"),
-                AlphabetKey("I", "8"),
-                AlphabetKey("O", "9"),
-                AlphabetKey("P", "0")
-            ),
-            listOf(
-                AlphabetKey("A", "@"),
-                AlphabetKey("S", "*"),
-                AlphabetKey("D", "+"),
-                AlphabetKey("F", "-"),
-                AlphabetKey("G", "="),
-                AlphabetKey("H", "/"),
-                AlphabetKey("J", "#"),
-                AlphabetKey("K", "("),
-                AlphabetKey("L", ")")
-            ),
-            listOf(
-                CapsKey(),
-                AlphabetKey("Z", "'"),
-                AlphabetKey("X", ":"),
-                AlphabetKey("C", "\""),
-                AlphabetKey("V", "?"),
-                AlphabetKey("B", "!"),
-                AlphabetKey("N", "~"),
-                AlphabetKey("M", "\\"),
-                BackspaceKey()
-            ),
-            listOf(
-                LayoutSwitchKey("?123", ""),
-                CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
-                LanguageKey(),
-                SpaceKey(),
-                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
-                ReturnKey()
+        val Layout: List<List<KeyDef>> by lazy {
+            layoutJson?.let { jsonLayout ->
+                jsonLayout.map { row ->
+                    row.value.map { key ->
+                        val keyObj = Json.parseToJsonElement(key).jsonObject
+                        when (keyObj["type"]?.jsonPrimitive?.content) {
+                            "AlphabetKey" -> AlphabetKey(
+                                keyObj["main"]?.jsonPrimitive?.content ?: "",
+                                keyObj["alt"]?.jsonPrimitive?.content ?: ""
+                            )
+                            "CapsKey" -> CapsKey()
+                            "BackspaceKey" -> BackspaceKey()
+                            "LayoutSwitchKey" -> LayoutSwitchKey(
+                                keyObj["main"]?.jsonPrimitive?.content ?: "",
+                                keyObj["alt"]?.jsonPrimitive?.content ?: ""
+                            )
+                            "CommaKey" -> CommaKey(
+                                keyObj["weight"]?.jsonPrimitive?.floatOrNull ?: 0.1f,
+                                KeyDef.Appearance.Variant.valueOf(keyObj["variant"]?.jsonPrimitive?.content ?: "Alternative")
+                            )
+                            "LanguageKey" -> LanguageKey()
+                            "SpaceKey" -> SpaceKey()
+                            "SymbolKey" -> SymbolKey(
+                                keyObj["main"]?.jsonPrimitive?.content ?: "",
+                                keyObj["weight"]?.jsonPrimitive?.floatOrNull ?: 0.1f,
+                                KeyDef.Appearance.Variant.valueOf(keyObj["variant"]?.jsonPrimitive?.content ?: "Alternative")
+                            )
+                            "ReturnKey" -> ReturnKey()
+                            else -> throw IllegalArgumentException("Unknown key type: ${keyObj["type"]?.jsonPrimitive?.content}")
+                        }
+                    }
+                }
+            } ?: listOf(
+                listOf(
+                    AlphabetKey("Q", "1"),
+                    AlphabetKey("W", "2"),
+                    AlphabetKey("E", "3"),
+                    AlphabetKey("R", "4"),
+                    AlphabetKey("T", "5"),
+                    AlphabetKey("Y", "6"),
+                    AlphabetKey("U", "7"),
+                    AlphabetKey("I", "8"),
+                    AlphabetKey("O", "9"),
+                    AlphabetKey("P", "0")
+                ),
+                listOf(
+                    AlphabetKey("A", "@"),
+                    AlphabetKey("S", "*"),
+                    AlphabetKey("D", "+"),
+                    AlphabetKey("F", "-"),
+                    AlphabetKey("G", "="),
+                    AlphabetKey("H", "/"),
+                    AlphabetKey("J", "#"),
+                    AlphabetKey("K", "("),
+                    AlphabetKey("L", ")")
+                ),
+                listOf(
+                    CapsKey(),
+                    AlphabetKey("Z", "'"),
+                    AlphabetKey("X", ":"),
+                    AlphabetKey("C", "\""),
+                    AlphabetKey("V", "?"),
+                    AlphabetKey("B", "!"),
+                    AlphabetKey("N", "~"),
+                    AlphabetKey("M", "\\"),
+                    BackspaceKey()
+                ),
+                listOf(
+                    LayoutSwitchKey("?123", ""),
+                    CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
+                    LanguageKey(),
+                    SpaceKey(),
+                    SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
+                    ReturnKey()
+                )
             )
-        )
+        }
     }
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
