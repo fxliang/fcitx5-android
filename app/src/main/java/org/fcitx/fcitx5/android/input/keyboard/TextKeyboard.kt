@@ -24,6 +24,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.fcitx.fcitx5.android.utils.appContext
 import java.io.File
+import kotlinx.serialization.json.doubleOrNull
 
 @SuppressLint("ViewConstructor")
 class TextKeyboard(
@@ -78,14 +79,14 @@ class TextKeyboard(
                                 keyObj["alt"]?.jsonPrimitive?.content ?: ""
                             )
                             "CommaKey" -> CommaKey(
-                                keyObj["weight"]?.jsonPrimitive?.floatOrNull ?: 0.1f,
+                                keyObj["weight"]?.jsonPrimitive?.doubleOrNull?.toFloat() ?: 0.1f,
                                 KeyDef.Appearance.Variant.valueOf(keyObj["variant"]?.jsonPrimitive?.content ?: "Alternative")
                             )
                             "LanguageKey" -> LanguageKey()
                             "SpaceKey" -> SpaceKey()
                             "SymbolKey" -> SymbolKey(
                                 keyObj["main"]?.jsonPrimitive?.content ?: "",
-                                keyObj["weight"]?.jsonPrimitive?.floatOrNull ?: 0.1f,
+                                keyObj["weight"]?.jsonPrimitive?.doubleOrNull?.toFloat() ?: 0.1f,
                                 KeyDef.Appearance.Variant.valueOf(keyObj["variant"]?.jsonPrimitive?.content ?: "Alternative")
                             )
                             "ReturnKey" -> ReturnKey()
