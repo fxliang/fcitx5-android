@@ -18,19 +18,94 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import splitties.views.imageResource
+import java.io.File
+import kotlinx.serialization.json.Json
+import org.fcitx.fcitx5.android.utils.appContext
+import kotlinx.serialization.Serializable
 
 @SuppressLint("ViewConstructor")
 class TextKeyboard(
     context: Context,
     theme: Theme
-) : BaseKeyboard(context, theme, Layout) {
+) : BaseKeyboard(context, theme, ::Layout) {
 
     enum class CapsState { None, Once, Lock }
 
     companion object {
         const val Name = "Text"
+        private var lastModified = 0L
 
-        val Layout: List<List<KeyDef>> = listOf(
+        @Serializable
+        data class KeyJson(
+            val type: String,
+            val main: String? = null,
+            val alt: String? = null,
+            val displayText: String? = null,
+            val label: String? = null,
+            val subLabel: String? = null,
+            val weight: Float? = null
+        )
+        var cachedLayoutJson: List<List<KeyJson>>? = null
+        val textLayoutJson : List<List<KeyJson>>?
+            @Synchronized
+            get() {
+                val file = File(appContext.getExternalFilesDir(null), "config/TextKeyboardLayout.json")
+                if (!file.exists()) {
+                    cachedLayoutJson = null
+                    return null
+                }
+                if (cachedLayoutJson == null || file.lastModified() != lastModified) {
+                    try {
+                        lastModified = file.lastModified()
+                        val json = file.readText()
+                        cachedLayoutJson = Json.decodeFromString<List<List<KeyJson>>>(json)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        cachedLayoutJson = null
+                    }
+                }
+                return cachedLayoutJson
+            }
+        val Layout: List<List<KeyDef>>
+            get() = textLayoutJson?.let { jsonLayout ->
+                try {
+                    jsonLayout.map { row ->
+                        row.map { keyJson ->
+                            when (keyJson.type) {
+                                "AlphabetKey" -> AlphabetKey(
+                                    keyJson.main ?: "",
+                                    keyJson.alt ?: "",
+                                    keyJson.displayText ?: keyJson.main ?: ""
+                                )
+                                "CapsKey" -> CapsKey()
+                                "BackspaceKey" -> BackspaceKey()
+                                "LayoutSwitchKey" -> LayoutSwitchKey(
+                                    keyJson.label ?: "",
+                                    keyJson.subLabel ?: ""
+                                )
+                                "CommaKey" -> CommaKey(
+                                    keyJson.weight ?: 1.0f,
+                                    KeyDef.Appearance.Variant.Alternative
+                                )
+                                "LanguageKey" -> LanguageKey()
+                                "SpaceKey" -> SpaceKey()
+                                "SymbolKey" -> SymbolKey(
+                                    keyJson.label ?: "",
+                                    keyJson.weight ?: 1.0f,
+                                    KeyDef.Appearance.Variant.Alternative
+                                )
+                                "ReturnKey" -> ReturnKey()
+                                else -> throw IllegalArgumentException("Unknown key type: ${keyJson.type}")
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    defaultLayout
+                }
+            } ?: defaultLayout
+
+        val defaultLayout: List<List<KeyDef>> = listOf(
             listOf(
                 AlphabetKey("Q", "1"),
                 AlphabetKey("W", "2"),

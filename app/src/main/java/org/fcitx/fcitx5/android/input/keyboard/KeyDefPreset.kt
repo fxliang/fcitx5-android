@@ -42,11 +42,12 @@ class SymbolKey(
 class AlphabetKey(
     val character: String,
     val punctuation: String,
+    val displayText: String = character,
     variant: Variant = Variant.Normal,
     popup: Array<Popup>? = null
 ) : KeyDef(
     Appearance.AltText(
-        displayText = character,
+        displayText = displayText,
         altText = punctuation,
         textSize = 23f,
         variant = variant

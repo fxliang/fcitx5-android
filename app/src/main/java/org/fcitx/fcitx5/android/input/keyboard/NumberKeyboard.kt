@@ -16,7 +16,7 @@ import splitties.views.imageResource
 class NumberKeyboard(
     context: Context,
     theme: Theme,
-) : BaseKeyboard(context, theme, Layout) {
+) : BaseKeyboard(context, theme, ::Layout) {
 
     companion object {
         const val Name = "Number"
