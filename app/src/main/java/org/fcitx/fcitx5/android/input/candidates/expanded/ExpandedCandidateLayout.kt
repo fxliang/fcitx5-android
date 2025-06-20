@@ -31,7 +31,7 @@ import splitties.views.imageResource
 @SuppressLint("ViewConstructor")
 class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout(context) {
 
-    class Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, Layout) {
+    class Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, ::Layout) {
         companion object {
             const val UpBtnLabel = "U"
             const val DownBtnLabel = "D"

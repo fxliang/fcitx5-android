@@ -46,9 +46,11 @@ import kotlin.math.roundToInt
 abstract class BaseKeyboard(
     context: Context,
     protected val theme: Theme,
-    private val keyLayout: List<List<KeyDef>>
+    private val layoutProvider: () ->List<List<KeyDef>>
 ) : ConstraintLayout(context) {
 
+    private val keyLayout: List<List<KeyDef>>
+        get() = layoutProvider()
     var keyActionListener: KeyActionListener? = null
 
     private val prefs = AppPrefs.getInstance()
