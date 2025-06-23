@@ -1,0 +1,138 @@
+name: Commit CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+    tags:
+      - '![0-9]+.*'
+    paths:
+      - '**/**'
+      - '!*.md'
+      - '!.gitignore'
+
+jobs:
+  build_commit:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-22.04
+          #- macos-13
+          #- windows-2022
+        abi:
+          #- armeabi-v7a
+          - arm64-v8a
+          #- x86
+          #- x86_64
+    env:
+      BUILD_ABI: ${{ matrix.abi }}
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      #- name: Regenerate symlinks pointing to submodule (Windows)
+      #  if: ${{ matrix.os == 'windows-2022' }}
+      #  run: |
+      #    Remove-Item -Recurse app/src/main/assets/usr/share
+      #    git checkout -- *
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android environment
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager --install "cmake;3.22.1"
+
+      - name: Install system dependencies (Ubuntu)
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        run: |
+          sudo apt update
+          sudo apt install extra-cmake-modules gettext
+
+      #- name: Install system dependencies (macOS)
+      #  if: ${{ matrix.os == 'macos-13' }}
+      #  run: |
+      #    brew install extra-cmake-modules
+
+      #- name: Install system dependencies (Windows)
+      #  if: ${{ matrix.os == 'windows-2022' }}
+      #  run: |
+      #    C:/msys64/usr/bin/pacman -S --noconfirm mingw-w64-ucrt-x86_64-gettext mingw-w64-ucrt-x86_64-extra-cmake-modules
+      #    Add-Content $env:GITHUB_PATH "C:/msys64/ucrt64/bin"
+
+      - name: Prepare personal build sources
+        run: |
+          ./prepare_personal_build.sh
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+
+      - name: Build Release APK
+        run: |
+          ./gradlew :app:assembleRelease
+          ./gradlew :assembleReleasePlugins
+      
+      # move plugin apks to app/build/outputs/apk/release
+      - name: Move plugin APKs
+        shell: bash
+        run: |
+          for i in $(ls plugin)
+          do
+            if [ -d "plugin/${i}" ]
+            then
+              mv "plugin/${i}/build/outputs/apk/release"/*.apk "app/build/outputs/apk/release/"
+            fi
+          done
+        
+      - name: Sign all App
+        uses: kevin-david/zipalign-sign-android-release@v1.1.1
+        id: sign_apk
+        with:
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+          zipAlign: true
+        env:
+          BUILD_TOOLS_VERSION: "31.0.0"
+
+      - name: Delete unsigned APKs
+        shell: bash
+        run: |
+          rm app/build/outputs/apk/release/*unsigned.apk
+          pushd app/build/outputs/apk/release
+          for file in *unsigned-*; do
+            new_name="${file/unsigned-/}"
+            mv -- "$file" "$new_name"
+          done
+          popd
+
+      - name: Upload app with plugins
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.os }}-${{ matrix.abi }}-with-plugins
+          path: app/build/outputs/apk/release/*.apk
+
+      # create nightly release
+      - name: Create Nightly release
+        uses: 'marvinpinto/action-automatic-releases@latest'
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          automatic_release_tag: latest
+          prerelease: true
+          title: "Nightly Build"
+          files: |
+            app/build/outputs/apk/release/*.apk
+
