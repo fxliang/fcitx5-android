@@ -58,50 +58,53 @@ class AutoScaleTextView @JvmOverloads constructor(
     private var textScaleY = 1.0f
 
     companion object {
-        private var cachedTypeface: Typeface? = null
-        private var cachedFontFilePath: String? = null
-        fun getFontTypeFace(key: String): Typeface? {
-            if (cachedTypeface != null) return cachedTypeface
+        private var cachedFontTypefaceMap: MutableMap<String, Typeface?> = mutableMapOf()
+        private var fontTypefaceMapInitialized = false
+
+        fun loadFontTypeFaces() {
             val fontsDir = File(appContext.getExternalFilesDir(null), "fonts")
             val jsonFile = File(fontsDir, "fontset.json")
-            if (!jsonFile.exists()) return null
-            return try {
+            if (!jsonFile.exists()) {
+                cachedFontTypefaceMap.clear()
+                return
+            }
+            try {
                 val json = JSONObject(jsonFile.readText())
-                val fontName = if (json.has(key)) json.getString(key) else return null
-                val fontFile = File(fontsDir, fontName)
-                if (!fontFile.exists()) return null
-                if (cachedFontFilePath != fontFile.absolutePath) {
-                    cachedTypeface = Typeface.createFromFile(fontFile)
-                    cachedFontFilePath = fontFile.absolutePath
+                json.keys().forEach { key ->
+                    val fontName = json.getString(key)
+                    val fontFile = File(fontsDir, fontName)
+                    val typeface = if (fontFile.exists()) {
+                        try {
+                            Typeface.createFromFile(fontFile)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            null
+                        }
+                    } else null
+                    cachedFontTypefaceMap[key] = typeface
                 }
-                cachedTypeface
             } catch (e: Exception) {
                 e.printStackTrace()
-                null
+                cachedFontTypefaceMap.clear()
             }
+            fontTypefaceMapInitialized = true
         }
-    }
-    init {
-      getFontTypeFace("font")?.let { typeface ->
-        setTypeface(typeface)
-      }
     }
 
-    /*
-    init {
-      getCandidateFontFile()?.let { file ->
-        if (file.exists()) {
-          try {
-            typeface = Typeface.createFromFile(file)
+    fun setFontTypeFace(key: String) {
+        cachedFontTypefaceMap[key]?.let { typeface ->
             setTypeface(typeface)
-          } catch (e: Exception) {
-            e.printStackTrace()
-          }
-        } else {
+        } ?: run {
+            setTypeface(Typeface.DEFAULT)
         }
-      }
     }
-    */
+
+    init {
+        if (!fontTypefaceMapInitialized) {
+            loadFontTypeFaces()
+        }
+        setFontTypeFace("font")
+    }
 
     override fun setText(charSequence: CharSequence?, bufferType: BufferType) {
         // setText can be called in super constructor
