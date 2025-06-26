@@ -32,38 +32,8 @@ class CandidateItemUi(override val ctx: Context, theme: Theme) : Ui {
         setTextColor(theme.candidateTextColor)
     }
 
-    //*
-    companion object {
-        private var cachedTypeface: Typeface? = null
-        private var cachedFontFilePath: String? = null
-        fun getFontTypeFace(key: String): Typeface? {
-            if (cachedTypeface != null) return cachedTypeface
-            val fontsDir = File(appContext.getExternalFilesDir(null), "fonts")
-            val jsonFile = File(fontsDir, "fontset.json")
-            if (!jsonFile.exists()) return null
-            return try {
-                val json = JSONObject(jsonFile.readText())
-                val fontName = if (json.has(key)) json.getString(key) else return null
-                val fontFile = File(fontsDir, fontName)
-                if (!fontFile.exists()) return null
-                if (cachedFontFilePath != fontFile.absolutePath) {
-                    cachedTypeface = Typeface.createFromFile(fontFile)
-                    cachedFontFilePath = fontFile.absolutePath
-                }
-                cachedTypeface
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-        }
-    }
-    //*/
-
     init {
-      // text.setFontTypeFace("cand_font")
-      getFontTypeFace("cand_font")?.let { typeface ->
-        text.typeface = typeface
-      }
+      text.setFontTypeFace("cand_font")
     }
 
     override val root = view(::CustomGestureView) {
