@@ -17,6 +17,10 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import org.json.JSONObject
+import java.io.File
+import android.graphics.Typeface
+import org.fcitx.fcitx5.android.utils.appContext
 
 @SuppressLint("AppCompatCustomView")
 class AutoScaleTextView @JvmOverloads constructor(
@@ -52,6 +56,52 @@ class AutoScaleTextView @JvmOverloads constructor(
     private var translateX = 0.0f
     private var textScaleX = 1.0f
     private var textScaleY = 1.0f
+
+    companion object {
+        private var cachedTypeface: Typeface? = null
+        private var cachedFontFilePath: String? = null
+        fun getFontTypeFace(key: String): Typeface? {
+            if (cachedTypeface != null) return cachedTypeface
+            val fontsDir = File(appContext.getExternalFilesDir(null), "fonts")
+            val jsonFile = File(fontsDir, "fontset.json")
+            if (!jsonFile.exists()) return null
+            return try {
+                val json = JSONObject(jsonFile.readText())
+                val fontName = if (json.has(key)) json.getString(key) else return null
+                val fontFile = File(fontsDir, fontName)
+                if (!fontFile.exists()) return null
+                if (cachedFontFilePath != fontFile.absolutePath) {
+                    cachedTypeface = Typeface.createFromFile(fontFile)
+                    cachedFontFilePath = fontFile.absolutePath
+                }
+                cachedTypeface
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+    }
+    init {
+      getFontTypeFace("font")?.let { typeface ->
+        setTypeface(typeface)
+      }
+    }
+
+    /*
+    init {
+      getCandidateFontFile()?.let { file ->
+        if (file.exists()) {
+          try {
+            typeface = Typeface.createFromFile(file)
+            setTypeface(typeface)
+          } catch (e: Exception) {
+            e.printStackTrace()
+          }
+        } else {
+        }
+      }
+    }
+    */
 
     override fun setText(charSequence: CharSequence?, bufferType: BufferType) {
         // setText can be called in super constructor
