@@ -58,51 +58,48 @@ class AutoScaleTextView @JvmOverloads constructor(
     private var textScaleY = 1.0f
 
     companion object {
-        private var cachedFontTypefaceMap: MutableMap<String, Typeface?> = mutableMapOf()
-        private var fontTypefaceMapInitialized = false
-
-        fun loadFontTypeFaces() {
-            val fontsDir = File(appContext.getExternalFilesDir(null), "fonts")
-            val jsonFile = File(fontsDir, "fontset.json")
-            if (!jsonFile.exists()) {
-                cachedFontTypefaceMap.clear()
-                return
-            }
-            try {
-                val json = JSONObject(jsonFile.readText())
-                json.keys().forEach { key ->
-                    val fontName = json.getString(key)
-                    val fontFile = File(fontsDir, fontName)
-                    val typeface = if (fontFile.exists()) {
-                        try {
-                            Typeface.createFromFile(fontFile)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                            null
-                        }
-                    } else null
-                    cachedFontTypefaceMap[key] = typeface
+        private var cachedFontTypefaceMap: MutableMap<String, Typeface?>? = null
+        private var lastModified = 0L
+        val fontTypefaceMap: MutableMap<String, Typeface?>
+            @Synchronized
+            get() {
+                val fontsDir = File(appContext.getExternalFilesDir(null), "fonts")
+                val jsonFile = File(fontsDir, "fontset.json")
+                if (!jsonFile.exists()) {
+                    cachedFontTypefaceMap = null
+                    return mutableMapOf() // 返回空Map而非null
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                cachedFontTypefaceMap.clear()
+                if (cachedFontTypefaceMap == null || lastModified != jsonFile.lastModified()) {
+                    val newMap = mutableMapOf<String, Typeface?>()
+                    try {
+                        val json = JSONObject(jsonFile.readText().replace(Regex("//.*?\\n"), ""))
+                        json.keys().forEach { key ->
+                            val fontName = json.getString(key)
+                            val fontFile = File(fontsDir, fontName)
+                            val typeface = if (fontFile.exists()) {
+                                try {
+                                    Typeface.createFromFile(fontFile)
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            } else null
+                            newMap[key] = typeface
+                        }
+                        cachedFontTypefaceMap = newMap
+                        lastModified = jsonFile.lastModified()
+                    } catch (e: Exception) {
+                        cachedFontTypefaceMap = newMap // 即使出错也返回新Map
+                    }
+                }
+                return cachedFontTypefaceMap ?: mutableMapOf()
             }
-            fontTypefaceMapInitialized = true
-        }
     }
 
     fun setFontTypeFace(key: String) {
-        cachedFontTypefaceMap[key]?.let { typeface ->
-            setTypeface(typeface)
-        } ?: run {
-            setTypeface(Typeface.DEFAULT)
-        }
+        setTypeface(fontTypefaceMap[key] ?: Typeface.DEFAULT)
     }
 
     init {
-        if (!fontTypefaceMapInitialized) {
-            loadFontTypeFaces()
-        }
         setFontTypeFace("font")
     }
 
