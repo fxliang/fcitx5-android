@@ -48,6 +48,7 @@ open class KeyDef(
         class AltText(
             displayText: String,
             val altText: String,
+            val character: String,
             textSize: Float,
             /**
              * `Int` constants in [Typeface].

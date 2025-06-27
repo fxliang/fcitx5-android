@@ -19,9 +19,33 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import splitties.views.imageResource
 import java.io.File
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import org.fcitx.fcitx5.android.utils.appContext
 import kotlinx.serialization.Serializable
+
+object DisplayTextResolver {
+    fun resolve(
+        displayText: JsonElement?,
+        subModeLabel: String,
+        default: String
+    ): String {
+        return when {
+            displayText == null -> default
+            displayText is JsonPrimitive -> displayText.content
+            displayText is JsonObject -> resolveMap(displayText, subModeLabel) ?: default
+            else -> default
+        }
+    }
+
+    private fun resolveMap(
+        map: JsonObject,
+        subModeLabel: String
+    ): String? {
+        // 直接匹配子模式标签
+        return map[subModeLabel]?.jsonPrimitive?.content
+            ?: map[""]?.jsonPrimitive?.content
+    }
+}
 
 @SuppressLint("ViewConstructor")
 class TextKeyboard(
@@ -34,40 +58,48 @@ class TextKeyboard(
     companion object {
         const val Name = "Text"
         private var lastModified = 0L
+        var ime: InputMethodEntry? = null
 
         @Serializable
         data class KeyJson(
             val type: String,
             val main: String? = null,
             val alt: String? = null,
-            val displayText: String? = null,
+            val displayText: JsonElement? = null,
             val label: String? = null,
             val subLabel: String? = null,
             val weight: Float? = null
         )
-        var cachedLayoutJson: List<List<KeyJson>>? = null
-        val textLayoutJson : List<List<KeyJson>>?
+        var cachedLayoutJsonMap: Map<String, List<List<KeyJson>>>? = null
+
+        val textLayoutJsonMap: Map<String, List<List<KeyJson>>>?
             @Synchronized
             get() {
                 val file = File(appContext.getExternalFilesDir(null), "config/TextKeyboardLayout.json")
                 if (!file.exists()) {
-                    cachedLayoutJson = null
+                    cachedLayoutJsonMap = null
                     return null
                 }
-                if (cachedLayoutJson == null || file.lastModified() != lastModified) {
+                if (cachedLayoutJsonMap == null || file.lastModified() != lastModified) {
                     try {
                         lastModified = file.lastModified()
                         val json = file.readText()
-                        cachedLayoutJson = Json.decodeFromString<List<List<KeyJson>>>(json)
+                        cachedLayoutJsonMap = Json.decodeFromString<Map<String, List<List<KeyJson>>>>(json)
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        cachedLayoutJson = null
+                        cachedLayoutJsonMap = null
                     }
                 }
-                return cachedLayoutJson
+                return cachedLayoutJsonMap
             }
+
+        private fun getTextLayoutJsonForIme(displayName: String): List<List<KeyJson>>? {
+            val map = textLayoutJsonMap ?: return null
+            return map[displayName] ?: defaultLayoutJson
+        }
+
         val Layout: List<List<KeyDef>>
-            get() = textLayoutJson?.let { jsonLayout ->
+            get() = getTextLayoutJsonForIme(ime?.uniqueName ?: "default")?.let { jsonLayout ->
                 try {
                     jsonLayout.map { row ->
                         row.map { keyJson ->
@@ -75,7 +107,11 @@ class TextKeyboard(
                                 "AlphabetKey" -> AlphabetKey(
                                     keyJson.main ?: "",
                                     keyJson.alt ?: "",
-                                    keyJson.displayText ?: keyJson.main ?: ""
+                                    DisplayTextResolver.resolve(
+                                        keyJson.displayText,
+                                        ime?.subMode?.label ?: "",
+                                        keyJson.main ?: ""
+                                    )
                                 )
                                 "CapsKey" -> CapsKey()
                                 "BackspaceKey" -> BackspaceKey()
@@ -149,6 +185,57 @@ class TextKeyboard(
                 ReturnKey()
             )
         )
+
+        val defaultLayoutJson: List<List<KeyJson>> = Json.decodeFromString<List<List<KeyJson>>>(
+            DEFAULT_KEYBOARD_LAYOUT_JSON
+        )
+
+        const val DEFAULT_KEYBOARD_LAYOUT_JSON = """
+        [
+        [
+        {"type": "AlphabetKey", "main": "Q", "alt": "1"},
+        {"type": "AlphabetKey", "main": "W", "alt": "2"},
+        {"type": "AlphabetKey", "main": "E", "alt": "3"},
+        {"type": "AlphabetKey", "main": "R", "alt": "4"},
+        {"type": "AlphabetKey", "main": "T", "alt": "5"},
+        {"type": "AlphabetKey", "main": "Y", "alt": "6"},
+        {"type": "AlphabetKey", "main": "U", "alt": "7"},
+        {"type": "AlphabetKey", "main": "I", "alt": "8"},
+        {"type": "AlphabetKey", "main": "O", "alt": "9"},
+        {"type": "AlphabetKey", "main": "P", "alt": "0"}
+        ],
+        [
+        {"type": "AlphabetKey", "main": "A", "alt": "@"},
+        {"type": "AlphabetKey", "main": "S", "alt": "*"},
+        {"type": "AlphabetKey", "main": "D", "alt": "+"},
+        {"type": "AlphabetKey", "main": "F", "alt": "-"},
+        {"type": "AlphabetKey", "main": "G", "alt": "="},
+        {"type": "AlphabetKey", "main": "H", "alt": "/"},
+        {"type": "AlphabetKey", "main": "J", "alt": "#"},
+        {"type": "AlphabetKey", "main": "K", "alt": "("},
+        {"type": "AlphabetKey", "main": "L", "alt": ")"}
+        ],
+        [
+        {"type": "CapsKey"},
+        {"type": "AlphabetKey", "main": "Z", "alt": "'"},
+        {"type": "AlphabetKey", "main": "X", "alt": ":"},
+        {"type": "AlphabetKey", "main": "C", "alt": "\""},
+        {"type": "AlphabetKey", "main": "V", "alt": "?"},
+        {"type": "AlphabetKey", "main": "B", "alt": "!"},
+        {"type": "AlphabetKey", "main": "N", "alt": "~"},
+        {"type": "AlphabetKey", "main": "M", "alt": "\\"},
+        {"type": "BackspaceKey"}
+        ],
+        [
+        {"type": "LayoutSwitchKey", "label": "?123", "subLabel": ""},
+        {"type": "CommaKey", "weight": 0.1},
+        {"type": "LanguageKey"},
+        {"type": "SpaceKey"},
+        {"type": "SymbolKey", "label": ".", "weight": 0.1},
+        {"type": "ReturnKey"}
+        ]
+        ]
+        """
     }
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
@@ -240,6 +327,9 @@ class TextKeyboard(
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
+        // update ime of companion object ime
+        TextKeyboard.ime = ime
+        updateAlphabetKeys()
         space.mainText.text = buildString {
             append(ime.displayName)
             ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
@@ -302,11 +392,40 @@ class TextKeyboard(
     }
 
     private fun updateAlphabetKeys() {
-        textKeys.forEach {
-            if (it.def !is KeyDef.Appearance.AltText) return
-            it.mainText.text = it.def.displayText.let { str ->
-                if (str.length != 1 || !str[0].isLetter()) return@forEach
-                if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
+        val layoutJson = getTextLayoutJsonForIme(ime?.uniqueName ?: "default")
+        if (layoutJson != null) {
+            textKeys.forEach {
+                if (it.def !is KeyDef.Appearance.AltText) return@forEach
+                val keyJson = layoutJson.flatten().find { key -> key.main == it.def.character }
+                val displayText = if (keyJson != null ) {
+                  DisplayTextResolver.resolve(
+                    keyJson.displayText,
+                    ime?.subMode?.label ?: "",
+                    keyJson.main ?: ""
+                  )
+                } else {
+                  it.def.character
+                }
+                // val displayText = keyJson?.displayText ?: keyJson?.main ?: it.def.character
+
+                it.mainText.text = displayText?.let { str ->
+                    if (keepLettersUppercase) {
+                      keyJson?.main?.uppercase() ?: str.uppercase()
+                    } else {
+                      when(capsState) {
+                        CapsState.None -> displayText.lowercase() ?: keyJson?.main?.lowercase() ?: str.lowercase()
+                        else -> keyJson?.main?.uppercase() ?: str.uppercase()
+                      }
+                    }
+                } ?: it.def.character
+            }
+        } else {
+            textKeys.forEach {
+                if (it.def !is KeyDef.Appearance.AltText) return
+                it.mainText.text = it.def.displayText.let { str ->
+                    if (str.length != 1 || !str[0].isLetter()) return@forEach
+                    if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
+                }
             }
         }
     }
