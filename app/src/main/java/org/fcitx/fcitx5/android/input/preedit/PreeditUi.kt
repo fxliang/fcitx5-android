@@ -23,6 +23,7 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.textView
 import splitties.views.dsl.core.verticalLayout
+import org.fcitx.fcitx5.android.input.AutoScaleTextView
 
 open class PreeditUi(
     override val ctx: Context,
@@ -48,6 +49,7 @@ open class PreeditUi(
         setTextColor(theme.keyTextColor)
         textSize = 16f
         setupTextView?.invoke(this)
+        typeface = AutoScaleTextView.fontTypefaceMap["preedit_font"] ?: typeface
     }
 
     private val upView = createTextView()
