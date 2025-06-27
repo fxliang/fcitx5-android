@@ -70,26 +70,19 @@ class AutoScaleTextView @JvmOverloads constructor(
                     return mutableMapOf() // 返回空Map而非null
                 }
                 if (cachedFontTypefaceMap == null || lastModified != jsonFile.lastModified()) {
-                    val newMap = mutableMapOf<String, Typeface?>()
-                    try {
-                        val json = JSONObject(jsonFile.readText().replace(Regex("//.*?\\n"), ""))
-                        json.keys().forEach { key ->
-                            val fontName = json.getString(key)
-                            val fontFile = File(fontsDir, fontName)
-                            val typeface = if (fontFile.exists()) {
-                                try {
-                                    Typeface.createFromFile(fontFile)
-                                } catch (e: Exception) {
-                                    null
-                                }
-                            } else null
-                            newMap[key] = typeface
-                        }
-                        cachedFontTypefaceMap = newMap
-                        lastModified = jsonFile.lastModified()
-                    } catch (e: Exception) {
-                        cachedFontTypefaceMap = newMap // 即使出错也返回新Map
-                    }
+                    cachedFontTypefaceMap = runCatching {
+                        JSONObject(jsonFile.readText().replace(Regex("//.*?\\n"), ""))
+                        .let { json ->
+                            json.keys().asSequence().associateTo(mutableMapOf()) { key ->
+                                key to runCatching {
+                                    File(fontsDir, json.getString(key))
+                                    .takeIf { it.exists() }
+                                    ?.let { Typeface.createFromFile(it) }
+                                }.getOrNull()
+                            }
+                        } as MutableMap<String, Typeface?> // 确保返回可变Map
+                    }.getOrElse { mutableMapOf() }
+                    lastModified = jsonFile.lastModified()
                 }
                 return cachedFontTypefaceMap ?: mutableMapOf()
             }
