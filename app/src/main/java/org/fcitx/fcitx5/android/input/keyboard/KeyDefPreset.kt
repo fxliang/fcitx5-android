@@ -49,6 +49,7 @@ class AlphabetKey(
     Appearance.AltText(
         displayText = displayText,
         altText = punctuation,
+        character = character,
         textSize = 23f,
         variant = variant
     ),
@@ -71,6 +72,7 @@ class AlphabetDigitKey(
     Appearance.AltText(
         displayText = character,
         altText = altText,
+        character = character,
         textSize = 23f
     ),
     setOf(
