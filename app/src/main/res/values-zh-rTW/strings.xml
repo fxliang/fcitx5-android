@@ -284,4 +284,12 @@
     <string name="ignore_system_window_insets">忽略系統窗口邊襯區 (WindowInsets)</string>
     <string name="browse_user_data_dir">瀏覽用户資料目錄</string>
     <string name="haptic_on_repeat">重複按鍵時的觸覺回饋</string>
-    </resources>
+    <string name="emoji_and_symbols">表情和符號</string>
+    <string name="default_emoji_skin_tone">預設表情符號膚色修飾符</string>
+    <string name="emoji_skin_tone_none">無修飾符</string>
+    <string name="emoji_skin_tone_type_1_2">🏻 非常淺色</string>
+    <string name="emoji_skin_tone_type_3">🏼 淺色</string>
+    <string name="emoji_skin_tone_type_4">🏽 中等色</string>
+    <string name="emoji_skin_tone_type_5">🏾 深色</string>
+    <string name="emoji_skin_tone_type_6">🏿 非常深色</string>
+</resources>
