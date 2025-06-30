@@ -303,4 +303,12 @@
     <string name="move_cursor_to_end">把光标移动到结尾</string>
     <string name="open_input_method_settings">打开输入法设置</string>
     <string name="delete_all">全部删除</string>
+    <string name="emoji_and_symbols">表情和符号</string>
+    <string name="default_emoji_skin_tone">默认表情符号肤色修饰符</string>
+    <string name="emoji_skin_tone_none">无修饰符</string>
+    <string name="emoji_skin_tone_type_1_2">🏻 非常浅色</string>
+    <string name="emoji_skin_tone_type_3">🏼 浅色</string>
+    <string name="emoji_skin_tone_type_4">🏽 中等色</string>
+    <string name="emoji_skin_tone_type_5">🏾 深色</string>
+    <string name="emoji_skin_tone_type_6">🏿 非常深色</string>
 </resources>
