@@ -255,8 +255,6 @@ class TextKeyboard(
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
 
     init {
-        updateLangSwitchKey(showLangSwitchKey.getValue())
-        showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
     }
 
     private val textKeys: List<TextKeyView> by lazy {
@@ -315,6 +313,12 @@ class TextKeyboard(
         capsState = CapsState.None
         updateCapsButtonIcon()
         updateAlphabetKeys()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        updateLangSwitchKey(showLangSwitchKey.getValue())
+        showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
     }
 
     override fun onReturnDrawableUpdate(returnDrawable: Int) {
