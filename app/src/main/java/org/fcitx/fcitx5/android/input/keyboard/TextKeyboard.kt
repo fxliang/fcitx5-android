@@ -95,53 +95,10 @@ class TextKeyboard(
 
         private fun getTextLayoutJsonForIme(displayName: String): List<List<KeyJson>>? {
             val map = textLayoutJsonMap ?: return null
-            return map[displayName] ?: defaultLayoutJson
+            return map[displayName] ?: null
         }
 
-        val Layout: List<List<KeyDef>>
-            get() = getTextLayoutJsonForIme(ime?.uniqueName ?: "default")?.let { jsonLayout ->
-                try {
-                    jsonLayout.map { row ->
-                        row.map { keyJson ->
-                            when (keyJson.type) {
-                                "AlphabetKey" -> AlphabetKey(
-                                    keyJson.main ?: "",
-                                    keyJson.alt ?: "",
-                                    DisplayTextResolver.resolve(
-                                        keyJson.displayText,
-                                        ime?.subMode?.label ?: "",
-                                        keyJson.main ?: ""
-                                    )
-                                )
-                                "CapsKey" -> CapsKey()
-                                "BackspaceKey" -> BackspaceKey()
-                                "LayoutSwitchKey" -> LayoutSwitchKey(
-                                    keyJson.label ?: "",
-                                    keyJson.subLabel ?: ""
-                                )
-                                "CommaKey" -> CommaKey(
-                                    keyJson.weight ?: 1.0f,
-                                    KeyDef.Appearance.Variant.Alternative
-                                )
-                                "LanguageKey" -> LanguageKey()
-                                "SpaceKey" -> SpaceKey()
-                                "SymbolKey" -> SymbolKey(
-                                    keyJson.label ?: "",
-                                    keyJson.weight ?: 1.0f,
-                                    KeyDef.Appearance.Variant.Alternative
-                                )
-                                "ReturnKey" -> ReturnKey()
-                                else -> throw IllegalArgumentException("Unknown key type: ${keyJson.type}")
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    defaultLayout
-                }
-            } ?: defaultLayout
-
-        val defaultLayout: List<List<KeyDef>> = listOf(
+        val Layout: List<List<KeyDef>> = listOf(
             listOf(
                 AlphabetKey("Q", "1"),
                 AlphabetKey("W", "2"),
@@ -185,57 +142,6 @@ class TextKeyboard(
                 ReturnKey()
             )
         )
-
-        val defaultLayoutJson: List<List<KeyJson>> = Json.decodeFromString<List<List<KeyJson>>>(
-            DEFAULT_KEYBOARD_LAYOUT_JSON
-        )
-
-        const val DEFAULT_KEYBOARD_LAYOUT_JSON = """
-        [
-        [
-        {"type": "AlphabetKey", "main": "Q", "alt": "1"},
-        {"type": "AlphabetKey", "main": "W", "alt": "2"},
-        {"type": "AlphabetKey", "main": "E", "alt": "3"},
-        {"type": "AlphabetKey", "main": "R", "alt": "4"},
-        {"type": "AlphabetKey", "main": "T", "alt": "5"},
-        {"type": "AlphabetKey", "main": "Y", "alt": "6"},
-        {"type": "AlphabetKey", "main": "U", "alt": "7"},
-        {"type": "AlphabetKey", "main": "I", "alt": "8"},
-        {"type": "AlphabetKey", "main": "O", "alt": "9"},
-        {"type": "AlphabetKey", "main": "P", "alt": "0"}
-        ],
-        [
-        {"type": "AlphabetKey", "main": "A", "alt": "@"},
-        {"type": "AlphabetKey", "main": "S", "alt": "*"},
-        {"type": "AlphabetKey", "main": "D", "alt": "+"},
-        {"type": "AlphabetKey", "main": "F", "alt": "-"},
-        {"type": "AlphabetKey", "main": "G", "alt": "="},
-        {"type": "AlphabetKey", "main": "H", "alt": "/"},
-        {"type": "AlphabetKey", "main": "J", "alt": "#"},
-        {"type": "AlphabetKey", "main": "K", "alt": "("},
-        {"type": "AlphabetKey", "main": "L", "alt": ")"}
-        ],
-        [
-        {"type": "CapsKey"},
-        {"type": "AlphabetKey", "main": "Z", "alt": "'"},
-        {"type": "AlphabetKey", "main": "X", "alt": ":"},
-        {"type": "AlphabetKey", "main": "C", "alt": "\""},
-        {"type": "AlphabetKey", "main": "V", "alt": "?"},
-        {"type": "AlphabetKey", "main": "B", "alt": "!"},
-        {"type": "AlphabetKey", "main": "N", "alt": "~"},
-        {"type": "AlphabetKey", "main": "M", "alt": "\\"},
-        {"type": "BackspaceKey"}
-        ],
-        [
-        {"type": "LayoutSwitchKey", "label": "?123", "subLabel": ""},
-        {"type": "CommaKey", "weight": 0.1},
-        {"type": "LanguageKey"},
-        {"type": "SpaceKey"},
-        {"type": "SymbolKey", "label": ".", "weight": 0.1},
-        {"type": "ReturnKey"}
-        ]
-        ]
-        """
     }
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
