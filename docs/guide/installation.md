@@ -26,7 +26,7 @@ fx 提供 **fx 构建**（与上游可共存）与 **mainline 构建**（替换�
 - `org.fcitx.fcitx5.android.plugin.rime-<version>.apk` —— Rime 输入引擎
 - `org.fcitx.fcitx5.android.plugin.chinese-addons-<version>.apk` —— 拼音 / 双拼等中文方案
 - `org.fcitx.fcitx5.android.plugin.text_editor-<version>.apk` —— 应用内文本编辑器（fx 新增）
-- 其他方案插件（五笔、仓颉、注音、Anthy、Hangul、Sayura、Thai、Unikey、Jyutping、Chewing、Clipboard-Filter 等）
+- 其他方案插件（五笔、仓颉、新酷音、Anthy、Hangul、Sayura、Thai、Unikey、Jyutping、Chewing、Clipboard-Filter 等）
 
 ::: tip 选择正确的 ABI
 若不确定设备架构，下载文件名含 `arm64-v8a` 的版本即可（覆盖大多数现代设备）。
