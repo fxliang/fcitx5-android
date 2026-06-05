@@ -25,7 +25,7 @@ fx 的 Release 同时提供两个版本的主程序 APK，以及一套魔改插�
 
 ## 插件兼容性矩阵
 
-魔改插件（Rime、chinese-addons、五笔、仓颉、注音、Anthy、Hangul、Sayura、Thai、Unikey、Jyutping、Chewing、Clipboard-Filter、Text-Editor 等）的包名 **沿用上游**，例如：
+魔改插件（Rime、chinese-addons、五笔、仓颉、新酷音、Anthy、Hangul、Sayura、Thai、Unikey、Jyutping、Chewing、Clipboard-Filter、Text-Editor 等）的包名 **沿用上游**，例如：
 
 ```
 org.fcitx.fcitx5.android.plugin.rime
