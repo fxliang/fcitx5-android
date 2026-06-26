@@ -85,6 +85,7 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
     private var maybeDoubleTap = false
 
     var onDoubleTapListener: ((View) -> Unit)? = null
+    var onLongPressReleaseListener: ((View) -> Unit)? = null
     var onRepeatListener: ((View) -> Unit)? = null
     var onGestureListener: OnGestureListener? = null
 
@@ -182,6 +183,9 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
                 isPressed = false
                 InputFeedbacks.hapticFeedback(this, longPress = true, keyUp = true)
                 dispatchGestureEvent(GestureType.Up, event.x, event.y)
+                if (longPressTriggered) {
+                    onLongPressReleaseListener?.invoke(this)
+                }
                 val shouldPerformClick = !(touchMovedOutside ||
                         longPressTriggered ||
                         repeatStarted ||
@@ -233,6 +237,9 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
             MotionEvent.ACTION_CANCEL -> {
                 isPressed = false
                 dispatchGestureEvent(GestureType.Up, event.x, event.y)
+                if (longPressTriggered) {
+                    onLongPressReleaseListener?.invoke(this)
+                }
                 resetState()
                 // reset double tap state on cancel
                 if (doubleTapEnabled) {

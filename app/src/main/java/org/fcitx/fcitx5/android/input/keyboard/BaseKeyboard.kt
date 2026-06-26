@@ -1270,6 +1270,7 @@ abstract class BaseKeyboard(
     ) {
         view.setOnClickListener(null)
         view.setOnLongClickListener(null)
+        view.onLongPressReleaseListener = null
         view.repeatEnabled = false
         view.onRepeatListener = null
         view.doubleTapEnabled = false
@@ -1298,6 +1299,11 @@ abstract class BaseKeyboard(
                     view.setOnLongClickListener { _ ->
                         onAction(it.action)
                         true
+                    }
+                    if (it.action is KeyAction.SpaceLongPressAction) {
+                        view.onLongPressReleaseListener = {
+                            onAction(KeyAction.SpaceLongPressReleaseAction)
+                        }
                     }
                 }
                 is KeyDef.Behavior.Repeat -> {

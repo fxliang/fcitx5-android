@@ -133,6 +133,8 @@ sealed class KeyAction {
 
     data object SpaceLongPressAction : KeyAction()
 
+    data object SpaceLongPressReleaseAction : KeyAction()
+
     data class LayerSwitchAction(
         val mode: LayerSwitchMode,
         val target: String

@@ -343,7 +343,9 @@ object VoiceInputProviderManager {
                 logI("provider ready")
                 service.lifecycleScope.launch {
                     onProviderReady(service, onLevel, onError)
-                    onReady()
+                    if (!finishing) {
+                        onReady()
+                    }
                 }
             }
 
@@ -701,6 +703,10 @@ object VoiceInputProviderManager {
                     .onFailure { Timber.w(it, "stop pre-roll capture") }
                 activeCapture = null
             }
+            if (finishing) {
+                sendEndStream(service)
+                return
+            }
             startCapture(service, onLevel, onError)
             return
         }
@@ -715,6 +721,9 @@ object VoiceInputProviderManager {
         logI("pre-roll flush: packets=${drained.size}")
         drained.forEach { queue.trySend(it) }
         activeAudioFeedJob = launchAudioFeedJob(service, queue)
+        if (finishing) {
+            finishAudioStream(service)
+        }
     }
 
     private fun launchAudioFeedJob(
@@ -797,7 +806,11 @@ object VoiceInputProviderManager {
         }
     }
 
-    private fun finish(context: Context = appContext) {
+    fun finish(context: Context = appContext) {
+        if (!isActive()) {
+            logI("finish ignored: no active session")
+            return
+        }
         if (floatingFallbackActive) {
             stopFloatingFallback(context)
             return
@@ -818,9 +831,21 @@ object VoiceInputProviderManager {
         activeCapture?.let {
             runCatching { it.stop() }.onFailure { Timber.w(it, "capture stop") }
         }
-        activeCapture = null
-        resetPreRoll()
 
+        if (activeAudioFeedQueue == null) {
+            synchronized(preRollLock) {
+                preRollActive = false
+            }
+            logI("finish deferred until provider is ready")
+            return
+        }
+
+        resetPreRoll()
+        activeCapture = null
+        finishAudioStream(context)
+    }
+
+    private fun finishAudioStream(context: Context) {
         val queue = activeAudioFeedQueue
         val feedJob = activeAudioFeedJob
         val scope = (context as? FcitxInputMethodService)?.lifecycleScope
