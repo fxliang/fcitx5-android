@@ -389,13 +389,40 @@ class TextKeyboard(
         val textLayoutJson: JsonObject?
             @Synchronized
             get() {
-                val snapshot = org.fcitx.fcitx5.android.input.config.ConfigProviders
-                    .readTextKeyboardLayout<JsonObject>() ?: run {
+                val providers = org.fcitx.fcitx5.android.input.config.ConfigProviders
+                val provider = providers.provider
+                val memoryJson = provider.textKeyboardLayoutJson()
+                if (memoryJson != null) {
+                    providers.ensureWatching()
+                    if (cachedRawLayoutJson !== memoryJson || lastRawLayoutFile != null) {
+                        cachedRawLayoutJson = memoryJson
+                        lastRawLayoutFile = null
+                        // Keep an in-memory snapshot distinct from a missing default file,
+                        // which also has a null path and zero last-modified timestamp.
+                        lastRawModified = Long.MIN_VALUE
+                        lastLayoutCacheInvalidated = 0L
+                        cachedKeyDefLayouts.clear()
+                    }
+                    return cachedRawLayoutJson
+                }
+
+                val file = provider.textKeyboardLayoutFile()
+                val currentFile = file?.absolutePath
+                val currentModified = file?.takeIf { it.exists() }?.lastModified() ?: 0L
+                if (cachedRawLayoutJson != null &&
+                    currentFile == lastRawLayoutFile &&
+                    currentModified == lastRawModified
+                ) {
+                    providers.ensureWatching()
+                    return cachedRawLayoutJson
+                }
+
+                val snapshot = providers.readTextKeyboardLayout<JsonObject>() ?: run {
                     cachedRawLayoutJson = null
                     lastRawLayoutFile = null
+                    lastRawModified = 0L
                     return null
                 }
-                val currentFile = snapshot.file?.absolutePath
                 if (cachedRawLayoutJson == null ||
                     currentFile != lastRawLayoutFile ||
                     snapshot.lastModified != lastRawModified
@@ -612,6 +639,10 @@ class TextKeyboard(
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
 
     init {
+        // BaseKeyboard has already built the initial layout. If the current IME was supplied
+        // before construction, remember its signature so onInputMethodUpdate does not rebuild
+        // the exact same custom layout immediately afterwards.
+        ime?.let { lastLayoutSignature = layoutSignature(it) }
     }
 
     private val textKeys: List<TextKeyView>

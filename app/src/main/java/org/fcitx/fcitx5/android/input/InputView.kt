@@ -1610,6 +1610,8 @@ class InputView(
     // Whether layout-related preferences should be treated as landscape.
     // Enabled when device is landscape OR when "use landscape layout when split" is enabled and split keyboard is active.
     // Prefer using the actual keyboard view width when available to decide if split is active.
+    private var layoutLandscapeReevaluationPosted = false
+
     private val isLayoutLandscape: Boolean
         get() {
             if (isLandscapeOrientation) return true
@@ -1636,14 +1638,23 @@ class InputView(
                 manager.shouldUseSplitKeyboard()
             }
 
-            // If we couldn't get real width, schedule a re-evaluation after layout so that
-            // once keyboardView has a width we refresh dependent UI.
-            if (realWidthPx <= 0) {
+            // This property is read several times while InputView is being constructed. Posting
+            // from every read used to queue a full refresh of every keyboard for each access,
+            // causing a large burst of main-thread work after the first layout. Coalesce the
+            // width-dependent recheck and only resize when the fallback decision was wrong.
+            if (realWidthPx <= 0 && !layoutLandscapeReevaluationPosted) {
+                layoutLandscapeReevaluationPosted = true
+                val fallbackShouldSplit = shouldSplit
                 keyboardView.post {
-                    // Refresh keyboard layouts if split state might differ
-                    (windowManager.getEssentialWindow(KeyboardWindow) as? KeyboardWindow)?.refreshAllKeyboards()
-                    updateKeyboardSize()
-                    requestLayout()
+                    layoutLandscapeReevaluationPosted = false
+                    val measuredWidth = keyboardView.width.takeIf { it > 0 }
+                        ?: windowManager.view.width.takeIf { it > 0 }
+                    if (measuredWidth != null &&
+                        manager.shouldUseSplitKeyboard(measuredWidth) != fallbackShouldSplit
+                    ) {
+                        updateKeyboardSize()
+                        requestLayout()
+                    }
                 }
             }
 

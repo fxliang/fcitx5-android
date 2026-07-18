@@ -67,11 +67,17 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private lateinit var keyboardView: FrameLayout
     private var currentTextScale = 1.0f
 
-    private val keyboards: HashMap<String, BaseKeyboard> by lazy {
-        hashMapOf(
-            TextKeyboard.Name to TextKeyboard(context, theme),
-            NumberKeyboard.Name to NumberKeyboard(context, theme)
-        )
+    private val keyboards = hashMapOf<String, BaseKeyboard>()
+
+    private fun getOrCreateKeyboard(name: String): BaseKeyboard? {
+        keyboards[name]?.let { return it }
+        val keyboard = when (name) {
+            TextKeyboard.Name -> TextKeyboard(context, theme)
+            NumberKeyboard.Name -> NumberKeyboard(context, theme)
+            else -> return null
+        }
+        keyboards[name] = keyboard
+        return keyboard
     }
     private var currentKeyboardName = ""
     private var lastSymbolType: String by AppPrefs.getInstance().internal.lastSymbolLayout
@@ -147,6 +153,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     // This will be called EXACTLY ONCE
     override fun onCreateView(): View {
+        // Make the current IME available before TextKeyboard's constructor builds its layout,
+        // avoiding an initial default layout followed by an immediate custom-layout rebuild.
+        TextKeyboard.ime = fcitx.runImmediately { inputMethodEntryCached }
         keyboardView = context.frameLayout(R.id.keyboard_view)
         attachLayout(TextKeyboard.Name)
         return keyboardView
@@ -163,11 +172,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private fun attachLayout(target: String) {
         currentKeyboardName = target
-        currentKeyboard?.let {
+        getOrCreateKeyboard(target)?.let {
             it.keyActionListener = keyActionListener
             it.popupActionListener = popupActionListener
             keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
-            it.refreshStyle()
             it.setTextScale(currentTextScale)
             it.onAttach()
             it.onReturnDrawableUpdate(returnKeyDrawable.resourceId)
@@ -183,7 +191,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     ) {
         val target = to.ifEmpty { lastSymbolType }
         ContextCompat.getMainExecutor(service).execute {
-            if (keyboards.containsKey(target)) {
+            if (target == TextKeyboard.Name || target == NumberKeyboard.Name) {
                 if (target == TextKeyboard.Name) {
                     clearCompanionKeyboardHeightOverride()
                 } else if (inheritTextHeight) {
