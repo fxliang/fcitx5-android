@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Rect
+import android.os.SystemClock
+import android.util.Log
 import android.util.SparseIntArray
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -169,6 +171,7 @@ abstract class BaseKeyboard(
     }
 
     protected open fun reloadLayout() {
+        val startedAt = SystemClock.elapsedRealtime()
         removeAllViews()
         cachedWaterRippleColor = null
         keyboardWaterRippleView = KeyboardWaterRippleView(context).also { rippleView ->
@@ -208,6 +211,11 @@ abstract class BaseKeyboard(
 
         keyboardWaterRippleView?.setOccluders(
             keyRows.flatMap { row -> row.children.mapNotNull { it as? KeyView }.toList() }
+        )
+        Log.i(
+            "FcitxColdStart",
+            "${javaClass.simpleName}.reloadLayout rows=${keyRows.size} " +
+                "duration=${SystemClock.elapsedRealtime() - startedAt}ms"
         )
     }
 

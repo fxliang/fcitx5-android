@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.text.InputType
+import android.os.SystemClock
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -153,11 +155,16 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     // This will be called EXACTLY ONCE
     override fun onCreateView(): View {
+        val startedAt = SystemClock.elapsedRealtime()
         // Make the current IME available before TextKeyboard's constructor builds its layout,
         // avoiding an initial default layout followed by an immediate custom-layout rebuild.
         TextKeyboard.ime = fcitx.runImmediately { inputMethodEntryCached }
         keyboardView = context.frameLayout(R.id.keyboard_view)
         attachLayout(TextKeyboard.Name)
+        Log.i(
+            "FcitxColdStart",
+            "KeyboardWindow.onCreateView duration=${SystemClock.elapsedRealtime() - startedAt}ms"
+        )
         return keyboardView
     }
 

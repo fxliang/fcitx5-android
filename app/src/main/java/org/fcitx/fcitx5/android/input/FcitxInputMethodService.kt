@@ -315,10 +315,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun replaceInputView(theme: Theme): InputView {
+        val startedAt = SystemClock.elapsedRealtime()
         val newInputView = InputView(this, fcitx, theme)
         setInputView(newInputView)
         inputDeviceManager.setInputView(newInputView)
         inputView = newInputView
+        android.util.Log.i(
+            "FcitxColdStart",
+            "replaceInputView duration=${SystemClock.elapsedRealtime() - startedAt}ms"
+        )
         return newInputView
     }
 
@@ -485,6 +490,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onCreate() {
+        val startedAt = SystemClock.elapsedRealtime()
+        android.util.Log.i("FcitxColdStart", "service.onCreate begin")
         fcitx = FcitxDaemon.connect(javaClass.name)
         lifecycleScope.launch {
             jobs.consumeEach { it.join() }
@@ -533,6 +540,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         decorView = window.window!!.decorView
         contentView = decorView.findViewById(android.R.id.content)
         lastKnownConfig = resources.configuration
+        android.util.Log.i(
+            "FcitxColdStart",
+            "service.onCreate duration=${SystemClock.elapsedRealtime() - startedAt}ms"
+        )
     }
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
@@ -994,7 +1005,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onCreateInputView(): View? {
+        val startedAt = SystemClock.elapsedRealtime()
+        android.util.Log.i("FcitxColdStart", "service.onCreateInputView begin")
         replaceInputViews(ThemeManager.activeTheme)
+        android.util.Log.i(
+            "FcitxColdStart",
+            "service.onCreateInputView duration=${SystemClock.elapsedRealtime() - startedAt}ms"
+        )
         // We will call `setInputView` by ourselves. This is fine.
         return null
     }
@@ -1419,6 +1436,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        android.util.Log.i("FcitxColdStart", "service.onStartInput restarting=$restarting")
         isInInputLifecycleCriticalPhase = true
         try {
             val inputSessionGeneration = ++this.inputSessionGeneration
@@ -1448,6 +1466,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
+        android.util.Log.i("FcitxColdStart", "service.onStartInputView restarting=$restarting")
         isInInputLifecycleCriticalPhase = true
         try {
             val inputSessionGeneration = this.inputSessionGeneration

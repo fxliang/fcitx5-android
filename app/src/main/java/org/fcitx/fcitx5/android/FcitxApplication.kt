@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.SmartDefaultInitializer
 import org.fcitx.fcitx5.android.data.prefs.SplitKeyboardStateManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.font.FontProviders
 import org.fcitx.fcitx5.android.ui.main.LogActivity
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.Locales
@@ -166,6 +167,9 @@ class FcitxApplication : Application() {
         }
         ClipboardManager.init(ctx)
         ThemeManager.init(resources.configuration)
+        // Start custom font I/O while the IME daemon is initializing so first view creation can
+        // reuse the cached typefaces instead of doing all file work on the main thread.
+        FontProviders.preloadFontsAsync()
         Locales.onLocaleChange(resources.configuration)
         registerReceiver(shutdownReceiver, IntentFilter(Intent.ACTION_SHUTDOWN))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !isDirectBootMode) {

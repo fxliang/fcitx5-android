@@ -10,6 +10,13 @@ interface FontProviderApi {
     fun clearCache()
     val fontTypefaceMap: MutableMap<String, Typeface?>
     val fontSizeMap: MutableMap<String, Float>
+
+    fun resolveTypeface(key: String, current: Typeface? = null): Typeface {
+        return fontTypefaceMap[key]
+            ?: fontTypefaceMap["font"]
+            ?: current
+            ?: Typeface.DEFAULT
+    }
 }
 
 object FontProviders {
@@ -116,10 +123,7 @@ object FontProviders {
      * specific key -> global "font" -> current view typeface (if provided) -> system default.
      */
     fun resolveTypeface(key: String, current: Typeface? = null): Typeface {
-        return fontTypefaceMap[key]
-            ?: fontTypefaceMap["font"]
-            ?: current
-            ?: Typeface.DEFAULT
+        return provider.resolveTypeface(key, current)
     }
 
     /**
