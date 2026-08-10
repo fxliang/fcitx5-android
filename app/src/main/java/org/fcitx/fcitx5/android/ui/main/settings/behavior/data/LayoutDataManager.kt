@@ -41,6 +41,7 @@ class LayoutDataManager(private val context: Context) {
     val layoutHeightPercentOverrides = mutableMapOf<String, Int>()
     val layoutHeightPercentOverridesLandscape = mutableMapOf<String, Int>()
     val layoutAuxBarConfigs = mutableMapOf<String, AuxBarConfig?>()
+    val layoutAuxBarKeys = mutableMapOf<String, MutableList<MutableMap<String, Any?>>>()
     
     /**
      * 原始数据快照，用于检测是否有更改
@@ -52,6 +53,8 @@ class LayoutDataManager(private val context: Context) {
     private var lastParsedLayoutHeightPercentOverridesLandscape: Map<String, Int> = emptyMap()
     private var originalLayoutAuxBarConfigs: Map<String, AuxBarConfig?> = emptyMap()
     private var lastParsedLayoutAuxBarConfigs: Map<String, AuxBarConfig?> = emptyMap()
+    private var originalLayoutAuxBarKeys: Map<String, List<Map<String, Any?>>> = emptyMap()
+    private var lastParsedLayoutAuxBarKeys: Map<String, List<Map<String, Any?>>> = emptyMap()
     
     /**
      * 迁移管理器
@@ -71,6 +74,7 @@ class LayoutDataManager(private val context: Context) {
         layoutHeightPercentOverrides.clear()
         layoutHeightPercentOverridesLandscape.clear()
         layoutAuxBarConfigs.clear()
+        layoutAuxBarKeys.clear()
         
         val parsed = if (file?.exists() == true && file.length() > 0) {
             parseJsonText(file.readText(), file.name)
@@ -87,6 +91,11 @@ class LayoutDataManager(private val context: Context) {
         layoutHeightPercentOverrides.putAll(lastParsedLayoutHeightPercentOverrides)
         layoutHeightPercentOverridesLandscape.putAll(lastParsedLayoutHeightPercentOverridesLandscape)
         layoutAuxBarConfigs.putAll(lastParsedLayoutAuxBarConfigs)
+        layoutAuxBarKeys.putAll(
+            lastParsedLayoutAuxBarKeys.mapValues { (_, keys) ->
+                keys.map { it.toMutableMap() }.toMutableList()
+            }
+        )
         pruneLayoutHeightOverrides()
         
         // 确保至少有一个布局
@@ -120,6 +129,12 @@ class LayoutDataManager(private val context: Context) {
                 layoutHeightPercentOverridesLandscape.putAll(lastParsedLayoutHeightPercentOverridesLandscape)
                 layoutAuxBarConfigs.clear()
                 layoutAuxBarConfigs.putAll(lastParsedLayoutAuxBarConfigs)
+                layoutAuxBarKeys.clear()
+                layoutAuxBarKeys.putAll(
+                    lastParsedLayoutAuxBarKeys.mapValues { (_, keys) ->
+                        keys.map { it.toMutableMap() }.toMutableList()
+                    }
+                )
                 pruneLayoutHeightOverrides()
                 // 确保至少有一个布局
                 if (entries.isEmpty()) {
@@ -138,6 +153,7 @@ class LayoutDataManager(private val context: Context) {
         originalLayoutHeightPercentOverrides = layoutHeightPercentOverrides.toSortedMap()
         originalLayoutHeightPercentOverridesLandscape = layoutHeightPercentOverridesLandscape.toSortedMap()
         originalLayoutAuxBarConfigs = layoutAuxBarConfigs.toSortedMap()
+        originalLayoutAuxBarKeys = normalizedLayoutAuxBarKeys()
 
         return true
     }
@@ -157,6 +173,7 @@ class LayoutDataManager(private val context: Context) {
         lastParsedLayoutHeightPercentOverrides = emptyMap()
         lastParsedLayoutHeightPercentOverridesLandscape = emptyMap()
         lastParsedLayoutAuxBarConfigs = emptyMap()
+        lastParsedLayoutAuxBarKeys = emptyMap()
         val lenientJson = Json {
             ignoreUnknownKeys = true
             isLenient = true
@@ -173,6 +190,7 @@ class LayoutDataManager(private val context: Context) {
             val parsedLayoutHeightOverrides = mutableMapOf<String, Int>()
             val parsedLayoutHeightOverridesLandscape = mutableMapOf<String, Int>()
             val parsedAuxBarConfigs = mutableMapOf<String, AuxBarConfig?>()
+            val parsedAuxBarKeys = mutableMapOf<String, List<Map<String, Any?>>>()
 
             // 处理每个布局条目
             jsonObject.entries.forEach { (layoutName, layoutValue) ->
@@ -186,6 +204,7 @@ class LayoutDataManager(private val context: Context) {
                             parseLayoutHeightPercent(layoutValue)?.let { parsedLayoutHeightOverrides[layoutName] = it }
                             parseLayoutHeightPercentLandscape(layoutValue)?.let { parsedLayoutHeightOverridesLandscape[layoutName] = it }
                             parseLayoutAuxBar(layoutValue)?.let { parsedAuxBarConfigs[layoutName] = it }
+                            parseLayoutAuxBarKeys(layoutValue)?.let { parsedAuxBarKeys[layoutName] = it }
                             layoutValue.jsonObject.entries.forEach { (subModeLabel, subModeValue) ->
                                 if (subModeLabel == LAYOUT_META_KEY) return@forEach
                                 val rowsElement = when (subModeValue) {
@@ -199,6 +218,7 @@ class LayoutDataManager(private val context: Context) {
                                             parsedLayoutHeightOverridesLandscape[subKey] = subPercent
                                         }
                                         parseLayoutAuxBar(subModeValue)?.let { parsedAuxBarConfigs[subKey] = it }
+                                        parseLayoutAuxBarKeys(subModeValue)?.let { parsedAuxBarKeys[subKey] = it }
                                         (subModeValue["default"] as? JsonArray) ?: (subModeValue[""] as? JsonArray)
                                     }
                                     else -> null
@@ -229,6 +249,7 @@ class LayoutDataManager(private val context: Context) {
             lastParsedLayoutHeightPercentOverrides = parsedLayoutHeightOverrides.toSortedMap()
             lastParsedLayoutHeightPercentOverridesLandscape = parsedLayoutHeightOverridesLandscape.toSortedMap()
             lastParsedLayoutAuxBarConfigs = parsedAuxBarConfigs.toSortedMap()
+            lastParsedLayoutAuxBarKeys = parsedAuxBarKeys.toSortedMap()
             
             if (result.isEmpty()) {
                 android.util.Log.w("LayoutDataManager", "No valid layouts found in JSON file")
@@ -245,7 +266,8 @@ class LayoutDataManager(private val context: Context) {
             entries,
             layoutHeightPercentOverrides,
             layoutHeightPercentOverridesLandscape,
-            layoutAuxBarConfigs
+            layoutAuxBarConfigs,
+            normalizedLayoutAuxBarKeys()
         )
         val prettyJson = Json { prettyPrint = true }
         return prettyJson.encodeToString(jsonElement) + "\n"
@@ -306,7 +328,8 @@ class LayoutDataManager(private val context: Context) {
                 entries,
                 layoutHeightPercentOverrides,
                 layoutHeightPercentOverridesLandscape,
-                layoutAuxBarConfigs
+                layoutAuxBarConfigs,
+                normalizedLayoutAuxBarKeys()
             )
             val compactJson = LayoutJsonUtils.formatJsonCompact(jsonElement)
             file.writeText(compactJson + "\n")
@@ -319,6 +342,7 @@ class LayoutDataManager(private val context: Context) {
             originalLayoutHeightPercentOverrides = layoutHeightPercentOverrides.toSortedMap()
             originalLayoutHeightPercentOverridesLandscape = layoutHeightPercentOverridesLandscape.toSortedMap()
             originalLayoutAuxBarConfigs = layoutAuxBarConfigs.toSortedMap()
+            originalLayoutAuxBarKeys = normalizedLayoutAuxBarKeys()
             
             true
         }.getOrElse { e ->
@@ -650,7 +674,8 @@ class LayoutDataManager(private val context: Context) {
         return normalizedEntries() != originalEntries ||
             layoutHeightPercentOverrides.toSortedMap() != originalLayoutHeightPercentOverrides ||
             layoutHeightPercentOverridesLandscape.toSortedMap() != originalLayoutHeightPercentOverridesLandscape ||
-            layoutAuxBarConfigs.toSortedMap() != originalLayoutAuxBarConfigs
+            layoutAuxBarConfigs.toSortedMap() != originalLayoutAuxBarConfigs ||
+            normalizedLayoutAuxBarKeys() != originalLayoutAuxBarKeys
     }
     
     /**
@@ -889,6 +914,39 @@ class LayoutDataManager(private val context: Context) {
         }
     }
 
+    fun getLayoutAuxBarKeys(layoutName: String): List<Map<String, Any?>> {
+        return layoutAuxBarKeys[layoutName]?.map { it.toMap() } ?: emptyList()
+    }
+
+    fun getLayoutAuxBarKeysRef(layoutName: String): MutableList<MutableMap<String, Any?>> {
+        return layoutAuxBarKeys.getOrPut(layoutName) { mutableListOf() }
+    }
+
+    fun setLayoutAuxBarKeys(layoutName: String, keys: List<Map<String, Any?>>) {
+        if (keys.isEmpty()) {
+            layoutAuxBarKeys.remove(layoutName)
+        } else {
+            layoutAuxBarKeys[layoutName] = keys.map { it.toMutableMap() }.toMutableList()
+        }
+    }
+
+    private fun normalizedLayoutAuxBarKeys(): Map<String, List<Map<String, Any?>>> {
+        return layoutAuxBarKeys.toSortedMap().mapValues { (_, keys) ->
+            keys.map { it.toMap() }
+        }
+    }
+
+    /**
+     * 从 aux_bar 元数据中解析自定义按键列表（无 tabs 时用于填充辅助选择栏）。
+     */
+    private fun parseLayoutAuxBarKeys(layoutObject: JsonObject): List<Map<String, Any?>>? {
+        val meta = layoutObject[LAYOUT_META_KEY] as? JsonObject ?: return null
+        val auxBarConfig = meta[LAYOUT_META_AUX_BAR_KEY] as? JsonObject ?: return null
+        val keysElement = auxBarConfig["keys"] as? JsonArray ?: return null
+        val rows = LayoutJsonUtils.parseLayoutRows(JsonArray(listOf(keysElement)))
+        return rows.firstOrNull()?.takeIf { it.isNotEmpty() }
+    }
+
     private fun normalizeRowsForParsedData(rows: List<List<Map<String, Any?>>>): List<List<Map<String, Any?>>> {
         return copyLayout(rows).also { normalizeRowHeightPercents(it) }
     }
@@ -904,6 +962,7 @@ class LayoutDataManager(private val context: Context) {
         layoutHeightPercentOverrides.keys.retainAll(validLayoutKeys)
         layoutHeightPercentOverridesLandscape.keys.retainAll(validLayoutKeys)
         layoutAuxBarConfigs.keys.retainAll(validLayoutKeys)
+        layoutAuxBarKeys.keys.retainAll(validLayoutKeys)
     }
 
     private fun normalizeRowHeightPercents(rows: MutableList<MutableList<MutableMap<String, Any?>>>) {

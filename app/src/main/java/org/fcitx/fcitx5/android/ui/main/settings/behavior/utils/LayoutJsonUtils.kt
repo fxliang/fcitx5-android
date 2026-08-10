@@ -869,7 +869,8 @@ object LayoutJsonUtils {
         entries: Map<String, List<List<Map<String, Any?>>>>,
         layoutHeightPercentOverrides: Map<String, Int> = emptyMap(),
         layoutHeightPercentOverridesLandscape: Map<String, Int> = emptyMap(),
-        layoutAuxBarConfigs: Map<String, AuxBarConfig?> = emptyMap()
+        layoutAuxBarConfigs: Map<String, AuxBarConfig?> = emptyMap(),
+        layoutAuxBarKeys: Map<String, List<Map<String, Any?>>> = emptyMap()
     ): JsonObject {
         val layoutMap = mutableMapOf<String, JsonElement>()
 
@@ -889,10 +890,20 @@ object LayoutJsonUtils {
                     AuxBarPosition.Right -> "right"
                     AuxBarPosition.AbovePreedit -> "above_preedit"
                 }
-                meta["aux_bar"] = JsonObject(mapOf(
+                val auxBarObj = mutableMapOf<String, JsonElement>(
                     "position" to JsonPrimitive(posStr),
                     "size_percent" to JsonPrimitive(config.sizePercent)
-                ))
+                )
+                layoutAuxBarKeys[overrideKey]?.takeIf { it.isNotEmpty() }?.let { keys ->
+                    auxBarObj["keys"] = JsonArray(keys.map { keyMap ->
+                        JsonObject(
+                            keyMap
+                                .filterValues { it != null }
+                                .mapValues { (_, v) -> convertToJsonProperty(v) }
+                        )
+                    })
+                }
+                meta["aux_bar"] = JsonObject(auxBarObj)
             }
             return JsonObject(meta)
         }

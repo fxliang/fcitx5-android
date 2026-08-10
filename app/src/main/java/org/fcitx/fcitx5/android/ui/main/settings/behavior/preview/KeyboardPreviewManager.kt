@@ -19,6 +19,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.AuxBarAction
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -56,6 +57,7 @@ class KeyboardPreviewManager(
     private val entries: Map<String, List<List<Map<String, Any?>>>>,
     private val layoutHeightPercentOverrideProvider: (String) -> Int? = { null },
     private val layoutAuxBarConfigProvider: (String) -> AuxBarConfig? = { null },
+    private val layoutAuxBarKeysProvider: (String) -> List<Map<String, Any?>> = { emptyList() },
     private val subModeNameToIdProvider: () -> Map<String, String> = { emptyMap() }
 ) {
     private var previewKeyboard: TextKeyboard? = null
@@ -146,6 +148,7 @@ class KeyboardPreviewManager(
         val effectiveKey = subModeKey ?: layoutName
         val auxBarConfig = if (layoutAuxBarConfigProvider(effectiveKey)?.position == org.fcitx.fcitx5.android.input.keyboard.AuxBarPosition.AbovePreedit) null
             else layoutAuxBarConfigProvider(effectiveKey)
+        val auxBarKeys = layoutAuxBarKeysProvider(effectiveKey)
         val meta = if (auxBarConfig != null) {
             val posStr = when (auxBarConfig.position) {
                 org.fcitx.fcitx5.android.input.keyboard.AuxBarPosition.Top -> "top"
@@ -154,10 +157,29 @@ class KeyboardPreviewManager(
                 org.fcitx.fcitx5.android.input.keyboard.AuxBarPosition.Right -> "right"
                 org.fcitx.fcitx5.android.input.keyboard.AuxBarPosition.AbovePreedit -> "top"
             }
-            JsonObject(mapOf(
-                "aux_bar" to JsonObject(mapOf(
+            val auxBarObj = JsonObject(
+                mutableMapOf<String, JsonElement>(
                     "position" to JsonPrimitive(posStr),
                     "size_percent" to JsonPrimitive(auxBarConfig.sizePercent)
+                ).apply {
+                    if (auxBarKeys.isNotEmpty()) {
+                        this["keys"] = JsonArray(auxBarKeys.map { keyMap ->
+                            JsonObject(keyMap.entries.associate { (k, v) ->
+                                k to LayoutJsonUtils.convertToJsonProperty(v)
+                            })
+                        })
+                    }
+                }
+            )
+            JsonObject(mapOf("aux_bar" to auxBarObj))
+        } else if (auxBarKeys.isNotEmpty()) {
+            JsonObject(mapOf(
+                "aux_bar" to JsonObject(mapOf(
+                    "keys" to JsonArray(auxBarKeys.map { keyMap ->
+                        JsonObject(keyMap.entries.associate { (k, v) ->
+                            k to LayoutJsonUtils.convertToJsonProperty(v)
+                        })
+                    })
                 ))
             ))
         } else null
@@ -261,6 +283,7 @@ class KeyboardPreviewManager(
             onInputMethodUpdate(previewIme)
             setTextScale(1.0f)
             refreshStyle()
+            updateAuxBarActions(emptyList<AuxBarAction>())
             previewBlurMask.applyTheme(theme, ThemeManager.prefs.keyBorder.getValue())
             previewBlurMask.bindKeyboard(this)
             post { previewBlurMask.refreshMask(hierarchyChanged = true) }

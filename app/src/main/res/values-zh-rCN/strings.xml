@@ -514,6 +514,10 @@
     <string name="text_keyboard_layout_aux_bar_top">顶部</string>
     <string name="text_keyboard_layout_aux_bar_bottom">底部</string>
     <string name="text_keyboard_layout_aux_bar_above_preedit">预编辑上方</string>
+    <string name="text_keyboard_layout_aux_bar_keys_title">辅助栏按键</string>
+    <string name="text_keyboard_layout_aux_bar_keys_hint">无标签页时在辅助栏显示。点按编辑，长按删除。</string>
+    <string name="text_keyboard_layout_aux_bar_keys_empty">暂无辅助栏按键，点按 + 添加。</string>
+    <string name="text_keyboard_layout_aux_bar_keys_delete_confirm">确认删除此辅助栏按键？</string>
     <string name="text_keyboard_layout_use_global_height">使用全局键盘高度</string>
     <string name="text_keyboard_layout_height_portrait">竖屏</string>
     <string name="text_keyboard_layout_height_landscape">横屏</string>

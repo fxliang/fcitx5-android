@@ -126,6 +126,10 @@ class TextKeyboardLayoutEditorActivity : AppCompatActivity() {
         }
     }
 
+    private var auxBarDialogKeysAdapter: AuxBarKeysAdapter? = null
+    private var auxBarDialogKeysRv: RecyclerView? = null
+    private var auxBarDialogKeysEmptyHint: TextView? = null
+
     private val spinnerContainer by lazy {
         LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -262,6 +266,11 @@ class TextKeyboardLayoutEditorActivity : AppCompatActivity() {
             layoutAuxBarConfigProvider = { layoutKey ->
                 dataManager.getLayoutAuxBarConfig(layoutKey)
             },
+            layoutAuxBarKeysProvider = { layoutKey ->
+                val baseKey = LayoutJsonUtils.baseLayoutNameFromEntryKey(layoutKey)
+                dataManager.getLayoutAuxBarKeys(layoutKey)
+                    .ifEmpty { dataManager.getLayoutAuxBarKeys(baseKey) }
+            },
             subModeNameToIdProvider = {
                 subModeManager.nameToIdMap
             }
@@ -316,6 +325,50 @@ class TextKeyboardLayoutEditorActivity : AppCompatActivity() {
                     if (keyIndex != null && rowIndex in rows.indices && keyIndex in rows[rowIndex].indices) {
                         rows[rowIndex].removeAt(keyIndex)
                         rowsAdapter?.notifyRowChanged(rowIndex)
+                        currentLayout?.let { name ->
+                            previewManager.updatePreview(name, resolvePreviewLabel(), fcitxConnection)
+                            updateSaveButtonState()
+                        }
+                    }
+                }
+            }
+        }
+
+    private val auxBarKeyEditorLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val data = result.data ?: return@registerForActivityResult
+            if (result.resultCode != RESULT_OK) return@registerForActivityResult
+
+            val action = data.getStringExtra(KeyEditorActivity.EXTRA_RESULT_ACTION) ?: return@registerForActivityResult
+            val keyIndex = data.takeIf { it.hasExtra(KeyEditorActivity.EXTRA_KEY_INDEX) }
+                ?.getIntExtra(KeyEditorActivity.EXTRA_KEY_INDEX, -1)
+                ?.takeIf { it >= 0 }
+
+            val layoutName = currentLayout ?: return@registerForActivityResult
+            val editingKey = currentEditingLayoutKey() ?: return@registerForActivityResult
+            val keys = dataManager.getLayoutAuxBarKeysRef(editingKey)
+
+            when (action) {
+                KeyEditorActivity.RESULT_ACTION_SAVE -> {
+                    val resultKeyData = data.serializable<HashMap<String, Any?>>(KeyEditorActivity.EXTRA_RESULT_KEY_DATA)
+                        ?.toMutableMap() ?: return@registerForActivityResult
+
+                    if (keyIndex != null && keyIndex in keys.indices) {
+                        keys[keyIndex] = resultKeyData
+                    } else {
+                        keys.add(resultKeyData)
+                    }
+                    refreshAuxBarKeysInDialog()
+                    currentLayout?.let { name ->
+                        previewManager.updatePreview(name, resolvePreviewLabel(), fcitxConnection)
+                        updateSaveButtonState()
+                    }
+                }
+
+                KeyEditorActivity.RESULT_ACTION_DELETE -> {
+                    if (keyIndex != null && keyIndex in keys.indices) {
+                        keys.removeAt(keyIndex)
+                        refreshAuxBarKeysInDialog()
                         currentLayout?.let { name ->
                             previewManager.updatePreview(name, resolvePreviewLabel(), fcitxConnection)
                             updateSaveButtonState()
@@ -1475,6 +1528,87 @@ class TextKeyboardLayoutEditorActivity : AppCompatActivity() {
         updateLayoutButtonBehavior()
     }
 
+    /**
+     * Refresh the auxiliary bar keys editor inside the aux bar dialog.
+     */
+    private fun refreshAuxBarKeysInDialog() {
+        val adapter = auxBarDialogKeysAdapter ?: return
+        val rv = auxBarDialogKeysRv
+        val editingKey = currentEditingLayoutKey()
+        val keys = editingKey?.let { dataManager.getLayoutAuxBarKeys(it) }.orEmpty()
+        // Force a full layout pass so old chip views are not visible during dialog transitions
+        rv?.adapter = null
+        rv?.removeAllViewsInLayout()
+        adapter.updateKeys(keys)
+        rv?.adapter = adapter
+        // Synchronously measure and layout to avoid deferred frame rendering
+        if (rv != null && rv.width > 0) {
+            rv.measure(
+                View.MeasureSpec.makeMeasureSpec(rv.width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(rv.height, View.MeasureSpec.UNSPECIFIED)
+            )
+            rv.layout(rv.left, rv.top, rv.right, rv.bottom)
+        }
+        val empty = keys.isEmpty()
+        auxBarDialogKeysEmptyHint?.visibility = if (empty) View.VISIBLE else View.GONE
+        rv?.visibility = View.VISIBLE
+    }
+
+    /**
+     * Open the key editor for an auxiliary bar key. Pass null to add a new key.
+     */
+    private fun openAuxBarKeyEditor(keyIndex: Int?) {
+        val layoutName = currentLayout ?: return
+        val editingLayoutKey = currentEditingLayoutKey() ?: return
+        val keys = dataManager.getLayoutAuxBarKeys(editingLayoutKey)
+        val keyData = keyIndex?.let { keys.getOrNull(it) }?.toMutableMap() ?: mutableMapOf()
+        val isEditingSubModeLayout = editingLayoutKey != layoutName
+
+        val isRime = subModeManager.isCurrentLayoutRime(layoutName)
+        val hasMultiSubmodeSupport = if (isRime) {
+            true
+        } else {
+            val (currentIme, fcitxLabels) = subModeManager.fetchCurrentImeAndSubModeLabels(layoutName)
+            fcitxLabels.size > 1
+        }
+
+        val launchIntent = Intent(this, KeyEditorActivity::class.java).apply {
+            putExtra(KeyEditorActivity.EXTRA_KEY_DATA, KeyEditorActivity.toSerializableMap(keyData))
+            putExtra(KeyEditorActivity.EXTRA_ROW_INDEX, -1)
+            keyIndex?.let { putExtra(KeyEditorActivity.EXTRA_KEY_INDEX, it) }
+            putExtra(KeyEditorActivity.EXTRA_IS_EDITING_SUBMODE_LAYOUT, isEditingSubModeLayout)
+            putExtra(KeyEditorActivity.EXTRA_CURRENT_SUBMODE_LABEL, previewSubModeLabel)
+            putExtra(KeyEditorActivity.EXTRA_HAS_MULTI_SUBMODE_SUPPORT, hasMultiSubmodeSupport)
+            putStringArrayListExtra(
+                KeyEditorActivity.EXTRA_AVAILABLE_LAYOUT_TARGETS,
+                ArrayList(entries.keys.sorted())
+            )
+        }
+        auxBarKeyEditorLauncher.launch(launchIntent)
+    }
+
+    private fun confirmDeleteAuxBarKey(keyIndex: Int) {
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.delete)
+            .setMessage(R.string.text_keyboard_layout_aux_bar_keys_delete_confirm)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                val editingLayoutKey = currentEditingLayoutKey() ?: return@setPositiveButton
+                val keys = dataManager.getLayoutAuxBarKeysRef(editingLayoutKey)
+                if (keyIndex in keys.indices) {
+                    keys.removeAt(keyIndex)
+                    refreshAuxBarKeysInDialog()
+                    currentLayout?.let { name ->
+                        previewManager.updatePreview(name, resolvePreviewLabel(), fcitxConnection)
+                        updateSaveButtonState()
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener { styleDialogTypography(dialog) }
+        dialog.show()
+    }
+
     private fun openKeyEditor(rowIndex: Int, keyIndex: Int?) {
         val layoutName = currentLayout ?: return
 
@@ -2110,9 +2244,61 @@ class TextKeyboardLayoutEditorActivity : AppCompatActivity() {
         container.addView(sizeSeek)
         container.addView(sizeValue)
 
+        // Aux bar keys editor section (keys shown in the aux bar when there are no tabs)
+        val keysTitle = TextView(this).apply {
+            text = getString(R.string.text_keyboard_layout_aux_bar_keys_title)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(12), 0, dp(2))
+        }
+        val keysRv = RecyclerView(this).apply {
+            layoutManager = LinearLayoutManager(this@TextKeyboardLayoutEditorActivity, LinearLayoutManager.HORIZONTAL, false)
+            itemAnimator = null
+        }
+        val keysEmpty = TextView(this).apply {
+            text = getString(R.string.text_keyboard_layout_aux_bar_keys_empty)
+            textSize = 13f
+            setTextColor(styledColor(android.R.attr.textColorSecondary))
+        }
+        auxBarDialogKeysRv = keysRv
+        auxBarDialogKeysEmptyHint = keysEmpty
+        auxBarDialogKeysAdapter = AuxBarKeysAdapter(this, object : AuxBarKeysAdapter.Listener {
+            override fun onKeyClick(index: Int) {
+                openAuxBarKeyEditor(index)
+            }
+
+            override fun onKeyLongClick(index: Int) {
+                confirmDeleteAuxBarKey(index)
+            }
+
+            override fun onAddKeyClick() {
+                openAuxBarKeyEditor(null)
+            }
+        })
+        keysRv.adapter = auxBarDialogKeysAdapter
+        container.addView(keysTitle)
+        container.addView(
+            keysRv,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+        container.addView(
+            keysEmpty,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+        refreshAuxBarKeysInDialog()
+
+        val scrollView = android.widget.ScrollView(this).apply {
+            addView(container, ViewGroup.LayoutParams(matchParent, wrapContent))
+        }
+
         val dialog = AlertDialog.Builder(this)
             .setTitle(getString(R.string.text_keyboard_layout_aux_bar_title, layoutName))
-            .setView(container)
+            .setView(scrollView)
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
             .create()
@@ -2963,4 +3149,106 @@ class TextKeyboardLayoutEditorActivity : AppCompatActivity() {
         val layoutHeightOverrides: Map<String, Int>,
         val layoutHeightOverridesLandscape: Map<String, Int>
     )
+
+    /**
+     * Horizontal chip adapter for editing auxiliary bar keys.
+     */
+    private class AuxBarKeysAdapter(
+        private val activity: TextKeyboardLayoutEditorActivity,
+        private val listener: Listener
+    ) : RecyclerView.Adapter<AuxBarKeysAdapter.ChipViewHolder>() {
+
+        private var keys = listOf<Map<String, Any?>>()
+
+        interface Listener {
+            fun onKeyClick(index: Int)
+            fun onKeyLongClick(index: Int)
+            fun onAddKeyClick()
+        }
+
+        fun updateKeys(newKeys: List<Map<String, Any?>>) {
+            keys = newKeys
+            notifyDataSetChanged()
+        }
+
+        override fun getItemCount() = keys.size + 1
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChipViewHolder {
+            val chip = TextView(activity).apply {
+                textSize = 14f
+                gravity = Gravity.CENTER
+                setPadding(activity.dp(10), activity.dp(8), activity.dp(10), activity.dp(8))
+            }
+            val lp = RecyclerView.LayoutParams(
+                RecyclerView.LayoutParams.WRAP_CONTENT,
+                RecyclerView.LayoutParams.WRAP_CONTENT
+            ).apply { rightMargin = activity.dp(6) }
+            chip.layoutParams = lp
+            return ChipViewHolder(chip)
+        }
+
+        override fun onBindViewHolder(holder: ChipViewHolder, position: Int) {
+            val chip = holder.chip
+            if (position == keys.size) {
+                // Add button - inherit the theme default text color so it adapts to light/dark
+                chip.text = "+"
+                chip.setTypeface(null, android.graphics.Typeface.BOLD)
+                chip.background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(activity.styledColor(android.R.attr.colorPrimary))
+                    setStroke(activity.dp(1), activity.styledColor(android.R.attr.colorControlNormal))
+                    cornerRadius = activity.dp(4).toFloat()
+                }
+                chip.setTextColor(activity.styledColor(android.R.attr.textColorPrimary))
+                chip.setOnClickListener { listener.onAddKeyClick() }
+                chip.setOnLongClickListener(null)
+            } else {
+                val key = keys[position]
+                val type = key["type"] as? String ?: ""
+                val isMacroKey = type == "MacroKey"
+                chip.text = activity.buildKeyLabelForEditor(key)
+                chip.setTypeface(null, android.graphics.Typeface.NORMAL)
+                chip.background = android.graphics.drawable.GradientDrawable().apply {
+                    if (isMacroKey) {
+                        setColor(activity.styledColor(android.R.attr.colorAccent))
+                        setStroke(activity.dp(2), activity.styledColor(android.R.attr.colorControlHighlight))
+                    } else {
+                        setColor(activity.styledColor(android.R.attr.colorButtonNormal))
+                        setStroke(activity.dp(1), activity.styledColor(android.R.attr.colorControlNormal))
+                    }
+                    cornerRadius = activity.dp(4).toFloat()
+                }
+                chip.setTextColor(
+                    if (isMacroKey) activity.styledColor(android.R.attr.textColorPrimaryInverse)
+                    else activity.styledColor(android.R.attr.textColorPrimary)
+                )
+                chip.setOnClickListener { listener.onKeyClick(position) }
+                chip.setOnLongClickListener {
+                    listener.onKeyLongClick(position)
+                    true
+                }
+            }
+        }
+
+        class ChipViewHolder(val chip: TextView) : RecyclerView.ViewHolder(chip)
+    }
+
+    private fun buildKeyLabelForEditor(key: Map<String, Any?>): String {
+        val type = key["type"] as? String ?: "?"
+        return when (type) {
+            "AlphabetKey" -> (key["main"] as? String)?.ifEmpty { "?" } ?: "?"
+            "CapsKey" -> getString(R.string.text_keyboard_layout_key_label_caps)
+            "LayoutSwitchKey" -> key["label"] as? String ?: "?123"
+            "CommaKey" -> ","
+            "LanguageKey" -> getString(R.string.text_keyboard_layout_key_label_lang)
+            "SpaceKey" -> getString(R.string.text_keyboard_layout_key_label_space)
+            "SymbolKey" -> key["label"] as? String ?: "."
+            "ReturnKey" -> getString(R.string.text_keyboard_layout_key_label_enter)
+            "BackspaceKey" -> "⌫"
+            "MacroKey" -> {
+                val label = key["label"] as? String ?: "M"
+                label.ifEmpty { "M" }
+            }
+            else -> type
+        }
+    }
 }

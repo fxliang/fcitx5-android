@@ -390,6 +390,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     override fun onInputPanelUpdate(data: FcitxEvent.InputPanelEvent.Data) {
         val auxActions = parseAuxActions(data)
+        if (auxActions == lastAuxActions) return
         lastAuxActions = auxActions
         applyAuxActions(auxActions)
     }

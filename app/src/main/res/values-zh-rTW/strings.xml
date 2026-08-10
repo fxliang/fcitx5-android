@@ -838,4 +838,8 @@
     <string name="text_keyboard_layout_aux_bar_top">頂部</string>
     <string name="text_keyboard_layout_aux_bar_bottom">底部</string>
     <string name="text_keyboard_layout_aux_bar_above_preedit">預編輯上方</string>
+    <string name="text_keyboard_layout_aux_bar_keys_title">輔助欄按鍵</string>
+    <string name="text_keyboard_layout_aux_bar_keys_hint">無標籤頁時在輔助欄顯示。點按編輯，長按刪除。</string>
+    <string name="text_keyboard_layout_aux_bar_keys_empty">暫無輔助欄按鍵，點按 + 新增。</string>
+    <string name="text_keyboard_layout_aux_bar_keys_delete_confirm">確認刪除此輔助欄按鍵？</string>
 </resources>

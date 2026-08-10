@@ -33,7 +33,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.behavior.utils.LayoutJsonUtils
 class TextKeyboard(
     context: Context,
     theme: Theme
-) : BaseKeyboard(context, theme, ::getLayout, ::getAuxBarConfig) {
+) : BaseKeyboard(context, theme, ::getLayout, ::getAuxBarConfig, ::getAuxBarKeyDefs) {
 
     enum class CapsState { None, Once, Lock }
 
@@ -123,6 +123,7 @@ class TextKeyboard(
         private var lastLayoutCacheInvalidated = 0L
         private var forcedLayoutKey: String? = null
         var resolvedAuxBarConfig: AuxBarConfig? = null
+        var resolvedAuxBarKeys: List<Map<String, Any?>> = emptyList()
 
         /**
          * Clear KeyDef layout cache. Call this after saving layout changes.
@@ -387,6 +388,34 @@ class TextKeyboard(
 
         fun getAuxBarConfig(): AuxBarConfig? = resolvedAuxBarConfig
 
+        /**
+         * 解析辅助选择栏的附加自定义按键（无 tabs 时用于填充辅助选择栏）。
+         */
+        private fun parseAuxBarKeys(layoutElement: JsonElement?): List<Map<String, Any?>> {
+            val objectElement = layoutElement as? JsonObject ?: return emptyList()
+            val meta = objectElement[LAYOUT_META_KEY] as? JsonObject ?: return emptyList()
+            val auxBarConfig = meta[LAYOUT_META_AUX_BAR_KEY] as? JsonObject ?: return emptyList()
+            val keysElement = auxBarConfig["keys"] as? JsonArray ?: return emptyList()
+            val rows = LayoutJsonUtils.parseLayoutRows(JsonArray(listOf(keysElement)))
+            return rows.firstOrNull() ?: emptyList()
+        }
+
+        fun getAuxBarKeyDefs(): List<KeyDef> {
+            val currentIme = ime
+            val subModeLabel = currentIme?.subMode?.label.orEmpty()
+            val subModeName = currentIme?.subMode?.name.orEmpty()
+            val schemaId = schemaIdFromSubModeIcon(currentIme?.subMode?.icon.orEmpty())
+            return resolvedAuxBarKeys.mapNotNull { keyMap ->
+                runCatching {
+                    val jsonObject = JsonObject(
+                        keyMap.mapValues { (_, v) -> LayoutJsonUtils.convertToJsonProperty(v) }
+                    )
+                    val keyJson = LayoutJsonUtils.parseKeyJson(jsonObject) ?: return@runCatching null
+                    LayoutJsonUtils.createKeyDef(keyJson, subModeLabel, schemaId, subModeName)
+                }.getOrNull()
+            }
+        }
+
         @Synchronized
         fun setCurrentLayoutHeightPercentOverride(percent: Int): Boolean {
             val layoutKey = currentHeightOverrideTargetLayoutKey() ?: return false
@@ -560,6 +589,12 @@ class TextKeyboard(
                         } else {
                             parseAuxBarConfig(json[baseName])
                         }
+                        resolvedAuxBarKeys = if (forcedSub.isNotEmpty()) {
+                            parseAuxBarKeys((json[baseName] as? JsonObject)?.get(forcedSub))
+                                .ifEmpty { parseAuxBarKeys(json[baseName]) }
+                        } else {
+                            parseAuxBarKeys(json[baseName])
+                        }
                         cachedAuxBarConfigs[cacheKey] = resolvedAuxBarConfig
                         return cachedKeyDefLayouts.getOrPut(cacheKey) {
                             forcedLayout.map { rowElement ->
@@ -606,6 +641,9 @@ class TextKeyboard(
                             resolvedAuxBarConfig =
                                 parseAuxBarConfig(subModeLayoutElement)
                                     ?: parseAuxBarConfig(imeLayoutElement)
+                            resolvedAuxBarKeys =
+                                parseAuxBarKeys(subModeLayoutElement)
+                                    .ifEmpty { parseAuxBarKeys(imeLayoutElement) }
                             // Use a cache key that includes submode and showLangSwitch for proper caching
                             // Include showLangSwitch in cache key so layout is re-created when setting changes
                             val cacheSubMode = matchedSubModeKey ?: "default"
@@ -631,6 +669,7 @@ class TextKeyboard(
                     json["default"]?.let { layoutElement ->
                         resolvedLayoutHeightPercentOverride = parseLayoutHeightPercentOverride(layoutElement)
                         resolvedAuxBarConfig = parseAuxBarConfig(layoutElement)
+                        resolvedAuxBarKeys = parseAuxBarKeys(layoutElement)
                         val layoutArray = parseLayoutArray(layoutElement)
                         if (layoutArray != null) {
                             val cacheKey = "default:$showLangSwitch:$lastRawModified"
@@ -647,6 +686,7 @@ class TextKeyboard(
             }
             resolvedLayoutHeightPercentOverride = null
             resolvedAuxBarConfig = null
+            resolvedAuxBarKeys = emptyList()
             return getDefaultLayout(showLangSwitch)
         }
 

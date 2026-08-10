@@ -24,6 +24,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.annotation.CallSuper
 import androidx.annotation.Keep
 import androidx.annotation.DrawableRes
@@ -94,13 +95,16 @@ abstract class BaseKeyboard(
     context: Context,
     protected var theme: Theme,
     private val layoutProvider: () ->List<List<KeyDef>>,
-    private val auxBarConfigProvider: () -> AuxBarConfig? = { null }
+    private val auxBarConfigProvider: () -> AuxBarConfig? = { null },
+    private val auxBarKeysProvider: () -> List<KeyDef> = { emptyList() }
 ) : ConstraintLayout(context) {
 
     private val keyLayout: List<List<KeyDef>>
         get() = layoutProvider()
     private val auxBarConfig: AuxBarConfig?
         get() = auxBarConfigProvider()
+    private val auxBarKeyDefs: List<KeyDef>
+        get() = auxBarKeysProvider()
     var keyActionListener: KeyActionListener? = null
     var auxBarListener: ((List<AuxBarAction>, List<AuxBarAction>) -> Unit)? = null
 
@@ -147,6 +151,8 @@ abstract class BaseKeyboard(
     private var auxBarInnerContainer: ConstraintLayout? = null
     private var auxBarScrollableAdapter: AuxBarAdapter? = null
     private var auxBarPinnedAdapter: AuxBarAdapter? = null
+    private var auxBarScrollableRv: RecyclerView? = null
+    private var auxBarKeyAdapter: AuxBarKeyAdapter? = null
     private var mainGridContainer: ConstraintLayout? = null
 
     private data class GestureBaseline(
@@ -206,6 +212,8 @@ abstract class BaseKeyboard(
         auxBarInnerContainer = null
         auxBarScrollableAdapter = null
         auxBarPinnedAdapter = null
+        auxBarScrollableRv = null
+        auxBarKeyAdapter = null
         mainGridContainer = null
         cachedWaterRippleColor = null
         keyboardWaterRippleView = KeyboardWaterRippleView(context).also { rippleView ->
@@ -261,6 +269,12 @@ abstract class BaseKeyboard(
                 keyActionListener?.onKeyAction(KeyAction.AuxBarTrigger(id), KeyActionListener.Source.Keyboard)
             }
             scrollableRv.adapter = scrollableAdapter
+            val keyAdapter = AuxBarKeyAdapter(
+                vertical = isVertical,
+                keyViewFactory = { def ->
+                    createKeyView(def, registerComposeAware = false).also(::applyConfiguredFonts)
+                }
+            )
             val pinnedRv = recyclerView {
                 layoutManager = LinearLayoutManager(context).apply {
                     orientation = if (isVertical) LinearLayoutManager.VERTICAL else LinearLayoutManager.HORIZONTAL
@@ -360,7 +374,12 @@ abstract class BaseKeyboard(
             auxBarInnerContainer = auxBarInnerLayout
             auxBarScrollableAdapter = scrollableAdapter
             auxBarPinnedAdapter = pinnedAdapter
+            auxBarScrollableRv = scrollableRv
+            auxBarKeyAdapter = keyAdapter
             mainGridContainer = mainGrid
+            // Keep aux bar usable before first candidate update (e.g. in preview or idle startup):
+            // if no tabs are available, show configured fallback keys immediately.
+            applyAuxBarContent(emptyList(), emptyList())
             keyRows.firstOrNull()?.let { firstRow ->
                 post {
                     val rowHeight = firstRow.height
@@ -369,6 +388,11 @@ abstract class BaseKeyboard(
                         if (visualHeight > 0) {
                             scrollableAdapter.setMinItemHeight(visualHeight)
                             pinnedAdapter.setMinItemHeight(visualHeight)
+                        }
+                        if (rowHeight > 0) {
+                            // KeyView already includes key vertical margins in its own drawing logic,
+                            // so use full row height to keep aux bar key height aligned with normal rows.
+                            keyAdapter.setMinItemHeight(rowHeight)
                         }
                     }
                     auxBarScrollableAdapter?.applyConfiguredFonts(scrollableRv)
@@ -409,6 +433,33 @@ abstract class BaseKeyboard(
         }
         if (cfg != null) {
             auxBarListener?.invoke(emptyList(), emptyList())
+            applyAuxBarContent(scrollable, pinned)
+        }
+    }
+
+    private fun applyAuxBarContent(scrollable: List<AuxBarAction>, pinned: List<AuxBarAction>) {
+        val cfg = auxBarConfig ?: return
+        val customKeys = auxBarKeyDefs
+        val hasTabs = scrollable.isNotEmpty() || pinned.isNotEmpty()
+        val maxKeyCount = when (cfg.position) {
+            AuxBarPosition.Left, AuxBarPosition.Right -> keyRows.size
+            else -> Int.MAX_VALUE
+        }
+        val visibleCustomKeys = customKeys.take(maxKeyCount)
+        if (!hasTabs && visibleCustomKeys.isNotEmpty() && auxBarKeyAdapter != null) {
+            // No tabs: fill the aux bar with the user-configured custom keys.
+            // For left/right aux bar, clamp count to keyboard row count.
+            val rv = auxBarScrollableRv
+            if (rv?.adapter != auxBarKeyAdapter) {
+                rv?.adapter = auxBarKeyAdapter
+            }
+            auxBarKeyAdapter?.updateKeys(visibleCustomKeys)
+            auxBarPinnedAdapter?.updateActions(emptyList())
+        } else {
+            val rv = auxBarScrollableRv
+            if (rv?.adapter != auxBarScrollableAdapter) {
+                rv?.adapter = auxBarScrollableAdapter
+            }
             auxBarScrollableAdapter?.updateActions(scrollable)
             auxBarPinnedAdapter?.updateActions(pinned)
         }
@@ -2546,6 +2597,7 @@ class AuxBarAdapter(
     }
 
     fun updateActions(newActions: List<AuxBarAction>) {
+        if (newActions == actions) return
         actions = newActions
         notifyDataSetChanged()
     }
@@ -2621,7 +2673,9 @@ class AuxBarAdapter(
                 )
             }
         } else {
-            view.background = insetRadiusDrawable(drawHMargin, drawVMargin, radius, bkgColor)
+            // Match borderless key rendering in KeyView: no persistent key background,
+            // only pressed-state highlight over the keyboard/bar surface.
+            view.background = null
             view.foreground = StateListDrawable().apply {
                 addState(
                     intArrayOf(android.R.attr.state_pressed),
@@ -2643,5 +2697,190 @@ class AuxBarAdapter(
             label.text = action.text
             view.setOnClickListener { onTrigger(action.id) }
         }
+    }
+}
+
+/**
+ * Adapter for the auxiliary bar that renders user-configured keys (used when the
+ * layout has an in-keyboard aux bar position but there are no tabs to display).
+ */
+class AuxBarKeyAdapter(
+    private val vertical: Boolean,
+    private val keyViewFactory: (KeyDef) -> KeyView
+) : RecyclerView.Adapter<AuxBarKeyAdapter.ViewHolder>() {
+
+    private var keys = listOf<KeyDef>()
+    private var keySignatures = listOf<String>()
+    private var minItemHeightPx: Int = -1
+    private var attachedRecyclerView: RecyclerView? = null
+    private var lastHorizontalWidth: Int = -1
+    private val horizontalLayoutChangeListener =
+        View.OnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+            if (vertical) return@OnLayoutChangeListener
+            val width = right - left
+            val oldWidth = oldRight - oldLeft
+            if (width > 0 && width != oldWidth && width != lastHorizontalWidth) {
+                lastHorizontalWidth = width
+                notifyDataSetChanged()
+            }
+        }
+
+    fun setMinItemHeight(px: Int) {
+        if (px > 0 && px != minItemHeightPx) {
+            minItemHeightPx = px
+            notifyDataSetChanged()
+        }
+    }
+
+    fun updateKeys(newKeys: List<KeyDef>) {
+        val newSignatures = newKeys.map(::buildKeySignature)
+        if (newSignatures == keySignatures) return
+        keys = newKeys
+        keySignatures = newSignatures
+        notifyDataSetChanged()
+    }
+
+    override fun getItemCount() = keys.size
+
+    override fun getItemId(position: Int): Long {
+        val sig = keySignatures.getOrNull(position) ?: return RecyclerView.NO_ID
+        return sig.hashCode().toLong()
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val ctx = parent.context
+        val view = FrameLayout(ctx).apply {
+            layoutParams = RecyclerView.LayoutParams(
+                if (!vertical) ViewGroup.LayoutParams.WRAP_CONTENT else ViewGroup.LayoutParams.MATCH_PARENT,
+                if (!vertical) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            if (vertical) {
+                minimumHeight = if (minItemHeightPx > 0) minItemHeightPx else ctx.dp(52)
+            }
+        }
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val key = keys.getOrNull(position) ?: return
+        val signature = keySignatures.getOrNull(position) ?: buildKeySignature(key)
+        if (!vertical) {
+            val rv = attachedRecyclerView ?: (holder.itemView.parent as? RecyclerView)
+            val usableWidth = rv?.let { (it.width - it.paddingLeft - it.paddingRight).coerceAtLeast(0) } ?: 0
+            if (usableWidth > 0 && itemCount > 0) {
+                val lp = holder.itemView.layoutParams as? RecyclerView.LayoutParams
+                    ?: RecyclerView.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                lp.width = usableWidth / itemCount
+                lp.height = ViewGroup.LayoutParams.MATCH_PARENT
+                lp.rightMargin = 0
+                holder.itemView.layoutParams = lp
+            }
+        }
+        holder.bind(key, signature)
+    }
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        attachedRecyclerView = recyclerView
+        if (!vertical) {
+            recyclerView.addOnLayoutChangeListener(horizontalLayoutChangeListener)
+            lastHorizontalWidth = recyclerView.width
+        }
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        if (!vertical) {
+            recyclerView.removeOnLayoutChangeListener(horizontalLayoutChangeListener)
+            lastHorizontalWidth = -1
+        }
+        if (attachedRecyclerView === recyclerView) {
+            attachedRecyclerView = null
+        }
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
+
+    inner class ViewHolder(private val container: FrameLayout) : RecyclerView.ViewHolder(container) {
+        private var boundSignature: String? = null
+        private var keyView: KeyView? = null
+
+        fun bind(key: KeyDef, signature: String) {
+            var current = keyView
+            if (current == null || boundSignature != signature) {
+                container.removeAllViews()
+                current = keyViewFactory(key).also { created ->
+                    created.setOnTouchListener { v, event ->
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                                v.parent?.requestDisallowInterceptTouchEvent(true)
+                            }
+                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                                v.parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                        }
+                        false
+                    }
+                    container.addView(
+                        created,
+                        ViewGroup.LayoutParams(
+                            if (!vertical) ViewGroup.LayoutParams.WRAP_CONTENT else ViewGroup.LayoutParams.MATCH_PARENT,
+                            if (!vertical) ViewGroup.LayoutParams.MATCH_PARENT else
+                                if (minItemHeightPx > 0) minItemHeightPx else container.context.dp(52)
+                        )
+                    )
+                }
+                keyView = current
+                boundSignature = signature
+            }
+            if (vertical) {
+                current.layoutParams = (current.layoutParams ?: ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )).apply {
+                    height = if (minItemHeightPx > 0) minItemHeightPx else container.context.dp(52)
+                }
+            } else {
+                current.layoutParams = (current.layoutParams ?: ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )).apply {
+                    width = ViewGroup.LayoutParams.MATCH_PARENT
+                    height = ViewGroup.LayoutParams.MATCH_PARENT
+                }
+            }
+        }
+    }
+
+    private fun buildKeySignature(key: KeyDef): String {
+        val app = key.appearance
+        val popupSig = key.popup?.joinToString("|") { it::class.java.name }.orEmpty()
+        val behaviorSig = key.behaviors
+            .sortedBy { it::class.java.name + it.hashCode() }
+            .joinToString("|") { it::class.java.name + ":" + it.hashCode() }
+        return buildString(128) {
+            append(key::class.java.name)
+            append('#').append(app::class.java.name)
+            append('#').append(app.variant.name)
+            append('#').append(app.border.name)
+            append('#').append(app.margin)
+            append('#').append(app.percentWidth)
+            append('#').append(app.viewId)
+            append('#').append(app.textColor)
+            append('#').append(app.textColorMonet)
+            append('#').append(app.altTextColor)
+            append('#').append(app.altTextColorMonet)
+            append('#').append(app.backgroundColor)
+            append('#').append(app.backgroundColorMonet)
+            append('#').append(app.shadowColor)
+            append('#').append(app.shadowColorMonet)
+            append('#').append(behaviorSig)
+            append('#').append(popupSig)
+        }
+    }
+
+    init {
+        setHasStableIds(true)
     }
 }
