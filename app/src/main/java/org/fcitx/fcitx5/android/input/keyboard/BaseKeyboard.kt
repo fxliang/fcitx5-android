@@ -171,6 +171,19 @@ abstract class BaseKeyboard(
 
     private val composeAwareKeys = mutableListOf<ComposeAwareKey>()
 
+    private data class ReusableRows(
+        val defs: List<List<KeyDef>>,
+        val containers: List<ConstraintLayout>
+    )
+
+    // Rows built by a previous reload are cached per layout/style signature and reused on
+    // the next reload with the same signature. Rebuilding the whole view tree on every key
+    // press (macrokey "layer to" or shift-based language switching) is the dominant source
+    // of input latency; reusing prebuilt rows skips the expensive view construction entirely.
+    // NOTE: must be declared before the init block, which triggers the first reloadLayout().
+    private val reusableRowsCache = HashMap<String, ReusableRows>()
+    private var lastRowsSignature: String? = null
+
     private var lastSplitLandscapeState = false
 
     @Keep
@@ -206,8 +219,74 @@ abstract class BaseKeyboard(
         splitKeyboardManager.registerListener(splitStateChangeListener)
     }
 
+    /**
+     * Signature identifying the semantic keyboard content (layer, input method, sub mode, ...).
+     * Subclasses rendering different KeyDef sets must override this so cached rows are never
+     * reused across different layouts.
+     */
+    protected open fun currentLayoutSignature(): String = ""
+
+    private fun currentRowsSignature(splitKeyboard: Boolean): String {
+        val prefs = ThemeManager.prefs
+        return buildString {
+            append(currentLayoutSignature())
+            append("|split:").append(splitKeyboard)
+            append("|orient:").append(resources.configuration.orientation)
+            append("|composing:").append(composing)
+            append("|gapScale:").append(horizontalGapScale)
+            append("|border:").append(prefs.keyBorder.getValue()).append(prefs.keyBorderStroke.getValue())
+            append("|ripple:").append(prefs.keyRippleEffect.getValue())
+            append("|radius:").append(prefs.keyRadius.getValue())
+            append("|oval:").append(prefs.specialKeyOvalShape.getValue())
+            append("|hMargins:").append(prefs.keyHorizontalMargin.getValue())
+                .append(",").append(prefs.keyHorizontalMarginLandscape.getValue())
+            append("|vMargins:").append(prefs.keyVerticalMargin.getValue())
+                .append(",").append(prefs.keyVerticalMarginLandscape.getValue())
+            append("|fontRefresh:").append(FontProviders.needsRefresh())
+        }
+    }
+
+    /**
+     * Re-register keyboard-level state for a reused row set. KeyViews keep the gesture
+     * configuration they were built with, so only the registries rebuilt on every reload
+     * (space keys, compose-aware keys) need to be repopulated.
+     */
+    private fun registerReusableRowState(rows: List<List<KeyDef>>, containers: List<ConstraintLayout>) {
+        rows.forEachIndexed { rowIndex, rowDefs ->
+            val container = containers.getOrNull(rowIndex) ?: return@forEachIndexed
+            val keyViews = container.children.mapNotNull { it as? KeyView }.toList()
+            rowDefs.forEachIndexed { keyIndex, def ->
+                val keyView = keyViews.getOrNull(keyIndex) ?: return@forEachIndexed
+                // Only register when the reused view really belongs to this def;
+                // when in doubt, skip to avoid wiring the wrong def to the view.
+                val matchesDef = keyView.def === def.appearance ||
+                    def.composeOverride?.appearance === keyView.def
+                if (!matchesDef) return@forEachIndexed
+                if (def is SpaceKey || def is MiniSpaceKey) {
+                    if (!spaceKeys.contains(keyView)) spaceKeys.add(keyView)
+                }
+                if (def.composeOverride != null) {
+                    composeAwareKeys += ComposeAwareKey(
+                        def,
+                        keyView,
+                        GestureBaseline(
+                            swipeEnabled = keyView.swipeEnabled,
+                            swipeRepeatEnabled = keyView.swipeRepeatEnabled,
+                            swipeThresholdX = keyView.swipeThresholdX,
+                            swipeThresholdY = keyView.swipeThresholdY,
+                            onGestureListener = keyView.onGestureListener
+                        )
+                    )
+                }
+            }
+        }
+    }
+
     protected open fun reloadLayout() {
         val startedAt = SystemClock.elapsedRealtime()
+        // Detach ripple-occluder listeners from views of the outgoing tree before it is
+        // discarded or cached; the ripple view itself is recreated on every reload.
+        keyboardWaterRippleView?.setOccluders(emptyList())
         removeAllViews()
         auxBarInnerContainer = null
         auxBarScrollableAdapter = null
@@ -228,17 +307,33 @@ abstract class BaseKeyboard(
         val rows = keyLayout
         rowHeightPercents = resolveRowHeightPercents(rows)
 
-        keyRows = rows.map { row ->
-            val keyViews = row.map(::createKeyView).apply {
-                // Batch apply fontset mappings for all key labels.
-                forEach(::applyConfiguredFonts)
+        val rowsSignature = currentRowsSignature(splitKeyboard)
+        val cachedRows = reusableRowsCache[rowsSignature]
+        // Reuse only when the cached rows were built from the exact same KeyDef instances;
+        // providers that re-create defs on every call (e.g. the builtin fallback layout)
+        // then rebuild instead of silently re-registering mismatched state.
+        keyRows = if (cachedRows != null && cachedRows.defs === rows) {
+            registerReusableRowState(rows, cachedRows.containers)
+            cachedRows.containers
+        } else {
+            val built = rows.map { row ->
+                val keyViews = row.map(::createKeyView).apply {
+                    // Batch apply fontset mappings for all key labels.
+                    forEach(::applyConfiguredFonts)
+                }
+                if (splitKeyboard) {
+                    buildSplitRow(row, keyViews)
+                } else {
+                    buildRegularRow(row, keyViews)
+                }
             }
-            if (splitKeyboard) {
-                buildSplitRow(row, keyViews)
-            } else {
-                buildRegularRow(row, keyViews)
+            if (reusableRowsCache.size >= 12) {
+                reusableRowsCache.clear()
             }
+            reusableRowsCache[rowsSignature] = ReusableRows(rows, built)
+            built
         }
+        lastRowsSignature = rowsSignature
 
         val auxBarConfig = auxBarConfig
         if (auxBarConfig != null && auxBarConfig.position != AuxBarPosition.AbovePreedit) {
@@ -901,6 +996,16 @@ abstract class BaseKeyboard(
     }
 
     /**
+     * Drop all cached row sets. Call before a reload that must rebuild rows even though
+     * the layout/style signature did not change (e.g. font set refresh whose flag was
+     * already consumed).
+     */
+    fun clearReusableRowsCache() {
+        reusableRowsCache.clear()
+        lastRowsSignature = null
+    }
+
+    /**
      * Lightweight style refresh, updates colors without rebuilding layout
      */
     fun refreshStyleLight() {
@@ -1099,6 +1204,11 @@ abstract class BaseKeyboard(
     open fun onCompositionStateChanged(composing: Boolean) {
         if (this.composing == composing) return
         this.composing = composing
+        // The attached rows are about to be mutated in place (compose-aware views get
+        // recreated). Evict the cache entry holding them so a later reload can never
+        // reuse rows that were modified under a different composition state.
+        lastRowsSignature?.let { reusableRowsCache.remove(it) }
+        lastRowsSignature = null
         data class PendingUpdate(
             val item: ComposeAwareKey,
             val activeDef: KeyDef,

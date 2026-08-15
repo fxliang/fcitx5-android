@@ -151,6 +151,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
      */
     fun checkAndApplyFontRefresh() {
         if (org.fcitx.fcitx5.android.input.font.FontProviders.checkAndClearRefreshFlag()) {
+            // The refresh flag is consumed above, so the rows cache would otherwise
+            // reuse rows built with the previous font set. Clear it first so
+            // refreshAllKeyboards() rebuilds rows and re-applies configured fonts.
+            keyboards.values.forEach { it.clearReusableRowsCache() }
             refreshAllKeyboards()
         }
     }
@@ -223,7 +227,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     fun switchLayout(
         to: String,
         remember: Boolean = true,
-        inheritTextHeight: Boolean = true
+        inheritTextHeight: Boolean = true,
+        notifyHeightChange: Boolean = true
     ) {
         val target = to.ifEmpty { lastSymbolType }
         ContextCompat.getMainExecutor(service).execute {
@@ -247,12 +252,16 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                         updateCompositionState()
                     }
                     applyAuxActions(lastAuxActions)
-                    service.inputView?.onKeyboardHeightSourceChanged()
+                    if (notifyHeightChange) {
+                        service.inputView?.onKeyboardHeightSourceChanged()
+                    }
                     return@execute
                 }
                 detachCurrentLayout()
                 attachLayout(target)
-                service.inputView?.onKeyboardHeightSourceChanged()
+                if (notifyHeightChange) {
+                    service.inputView?.onKeyboardHeightSourceChanged()
+                }
                 if (windowManager.isAttached(this)) {
                     notifyBarLayoutChanged()
                 }
@@ -324,11 +333,15 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private fun handleLayerSwitchAction(action: KeyAction.LayerSwitchAction) {
         val hadAuxBarConfig = TextKeyboard.getAuxBarConfig() != null
+        val heightBefore = TextKeyboard.currentLayoutHeightPercentOverride()
         val resolved = TextKeyboard.resolveLayerTargetKey(action.target)
         if (resolved == null) {
             if (action.mode == KeyAction.LayerSwitchMode.TO) {
                 clearAllLayerOverrides()
-                service.inputView?.onKeyboardHeightSourceChanged()
+                val heightAfter = TextKeyboard.currentLayoutHeightPercentOverride()
+                if (heightBefore != heightAfter) {
+                    service.inputView?.onKeyboardHeightSourceChanged()
+                }
             }
             return
         }
@@ -343,7 +356,12 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
         applyEffectiveTextLayer()
         refreshNoConfigAuxBarFallback(hadAuxBarConfig)
-        switchLayout(TextKeyboard.Name, remember = false)
+        val heightAfter = TextKeyboard.currentLayoutHeightPercentOverride()
+        switchLayout(
+            TextKeyboard.Name,
+            remember = false,
+            notifyHeightChange = heightBefore != heightAfter
+        )
     }
 
     fun switchLayer(mode: KeyAction.LayerSwitchMode, target: String) {
@@ -369,9 +387,16 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     override fun onImeUpdate(ime: InputMethodEntry) {
+        val heightBefore = TextKeyboard.currentLayoutHeightPercentOverride()
         clearAllLayerOverrides()
         currentKeyboard?.onInputMethodUpdate(ime)
-        service.inputView?.onKeyboardHeightSourceChanged()
+        val heightAfter = TextKeyboard.currentLayoutHeightPercentOverride()
+        // Avoid the IME-window height update path when the resolved keyboard height did not
+        // actually change. This runs on every input method/sub-mode update (e.g. pressing
+        // shift to toggle language) and used to be an unconditional, expensive window relayout.
+        if (heightBefore != heightAfter) {
+            service.inputView?.onKeyboardHeightSourceChanged()
+        }
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {

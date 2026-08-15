@@ -139,11 +139,11 @@ class TextKeyboard(
             val normalized = layoutKey?.trim()?.takeIf { it.isNotEmpty() }
             if (forcedLayoutKey == normalized) return
             forcedLayoutKey = normalized
-            cachedKeyDefLayouts.clear()
             val living = attachedKeyboards.mapNotNull { it.get() }
             attachedKeyboards.removeAll { it.get() == null }
             living.forEach { keyboard ->
                 keyboard.refreshStyle()
+                keyboard.markLayoutSignatureApplied()
                 ime?.let { keyboard.updateSpaceLabel(it) }
             }
         }
@@ -842,6 +842,90 @@ class TextKeyboard(
     private var lastLayoutSignature: String? = null
     private fun transformPunctuation(p: String) = punctuationMapping.getOrDefault(p, p)
 
+    private fun selectedLayoutArray(ime: InputMethodEntry): JsonArray? {
+        val json = textLayoutJson ?: return null
+        forcedLayoutKey?.let { forced ->
+            return findLayoutElementByKey(json, forced)
+        }
+        val imeLayoutElement = json[ime.uniqueName] ?: json[ime.displayName]
+        if (imeLayoutElement != null) {
+            val subModeLabel = ime.subMode.run { label.ifEmpty { name.ifEmpty { "" } } }
+            val schemaId = schemaIdFromSubModeIcon(ime.subMode.icon)
+            val subModeName = ime.subMode.name
+            val subModeLayoutElement = resolveSubModeLayoutElement(
+                imeLayoutElement = imeLayoutElement,
+                subModeLabel = subModeLabel,
+                schemaId = schemaId,
+                subModeName = subModeName
+            )
+            // Note: parenthesize explicitly — `?:` binds looser than `?.`,
+            // so without grouping a non-null first operand would NOT return here
+            // and the function would fall through to the "default" lookup (and
+            // wrongly report null for flat layouts that have no "default" key).
+            val layoutArray = parseLayoutArray(subModeLayoutElement)
+                ?: parseLayoutArray(imeLayoutElement)
+            if (layoutArray != null) return layoutArray
+        }
+        return parseLayoutArray(json["default"])
+    }
+
+    private fun layoutArrayUsesSubMode(rows: JsonArray): Boolean {
+        for (rowElement in rows) {
+            val row = rowElement as? JsonArray ?: return true
+            for (keyElement in row) {
+                val key = keyElement as? JsonObject ?: return true
+                if (key["displayText"] is JsonObject) return true
+                val composeOverride = key["composeOverride"] as? JsonObject
+                if (composeOverride?.get("displayText") is JsonObject) return true
+            }
+        }
+        return false
+    }
+
+    private var cachedUsesSubModeKey: String? = null
+    private var cachedUsesSubModeValue = false
+
+    /**
+     * Whether the resolved layout renders sub-mode-specific content. Runs on every layout
+     * signature computation, so memoize the scan result per (layer, ime, sub mode, layout
+     * file revision); the layout JSON is only invalidated when [lastRawModified] changes.
+     */
+    private fun layoutUsesSubMode(ime: InputMethodEntry): Boolean {
+        val cacheKey = buildString {
+            append(forcedLayoutKey ?: "")
+            append('|').append(ime.uniqueName)
+            append('|').append(ime.displayName)
+            append('|').append(ime.subMode.label)
+            append('|').append(ime.subMode.name)
+            append('|').append(ime.subMode.icon)
+            append('|').append(lastRawModified)
+        }
+        if (cachedUsesSubModeKey == cacheKey) return cachedUsesSubModeValue
+        val result = layoutUsesSubModeInternal(ime)
+        cachedUsesSubModeKey = cacheKey
+        cachedUsesSubModeValue = result
+        return result
+    }
+
+    private fun layoutUsesSubModeInternal(ime: InputMethodEntry): Boolean {
+        val json = textLayoutJson ?: return true
+        forcedLayoutKey?.let { forced ->
+            val rows = findLayoutElementByKey(json, forced) ?: return true
+            return layoutArrayUsesSubMode(rows)
+        }
+        val baseElement = json[ime.uniqueName] ?: json[ime.displayName]
+        if (baseElement is JsonObject) {
+            val hasSubModeLayout = baseElement.keys.any { key ->
+                key != LAYOUT_META_KEY &&
+                    key != "default" &&
+                    key != "" &&
+                    parseLayoutArray(baseElement[key]) != null
+            }
+            if (hasSubModeLayout) return true
+        }
+        return layoutArrayUsesSubMode(selectedLayoutArray(ime) ?: return true)
+    }
+
     private fun layoutSignature(ime: InputMethodEntry): String {
         val json = textLayoutJson
         val layoutSource = when {
@@ -851,7 +935,93 @@ class TextKeyboard(
         }
         val subModeLabel = ime.subMode.run { label.ifEmpty { name.ifEmpty { "" } } }
         val forced = forcedLayoutKey ?: ""
-        return "$layoutSource|$subModeLabel|$forced|$lastRawModified"
+        return buildString {
+            append(layoutSource)
+            if (layoutUsesSubMode(ime)) {
+                append('|')
+                append(subModeLabel)
+            }
+            append('|')
+            append(forced)
+            append('|')
+            append(lastRawModified)
+        }
+    }
+
+    internal fun markLayoutSignatureApplied() {
+        val currentIme = TextKeyboard.ime ?: return
+        lastLayoutSignature = layoutSignature(currentIme)
+    }
+
+    /**
+     * Signature describing which KeyDef layout the keyboard currently renders.
+     * It mirrors the branch logic of [getLayout] so rows cached by BaseKeyboard are only
+     * reused when the resolved layout (layer / input method / sub mode / layout file) is
+     * actually the same.
+     */
+    protected override fun currentLayoutSignature(): String {
+        val json = textLayoutJson
+        val currentIme = ime
+        val showLangSwitch = AppPrefs.getInstance().keyboard.showLangSwitchKey.getValue()
+        val imeName = currentIme?.uniqueName
+        val displayName = currentIme?.displayName
+        val subModeLabel = currentIme?.subMode?.label ?: ""
+        val subModeName = currentIme?.subMode?.name ?: ""
+        val schemaId = schemaIdFromSubModeIcon(currentIme?.subMode?.icon ?: "")
+        // Only distinguish by sub mode when the layout actually renders sub-mode-specific
+        // content; for flat layouts the KeyDef output is identical across sub modes and
+        // including this context would invalidate the row cache on every shift toggle.
+        val usesSubMode = currentIme?.let { layoutUsesSubMode(it) } ?: false
+        val contextKey = if (usesSubMode) {
+            listOf(schemaId, subModeLabel, subModeName)
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .joinToString(separator = "|")
+                .ifEmpty { "none" }
+        } else {
+            "none"
+        }
+        val forced = forcedLayoutKey
+        val branch = when {
+            forced != null && json != null && findLayoutElementByKey(json, forced) != null ->
+                "forced:$forced"
+            imeName != null && json != null &&
+                (json[imeName] != null || displayName?.let { json[it] } != null) -> {
+                val imeLayoutElement = json[imeName] ?: displayName?.let { json[it] }
+                if (imeLayoutElement != null) {
+                    val subModeLayoutElement = resolveSubModeLayoutElement(
+                        imeLayoutElement = imeLayoutElement,
+                        subModeLabel = subModeLabel,
+                        schemaId = schemaId,
+                        subModeName = subModeName
+                    )
+                    if (parseLayoutArray(subModeLayoutElement) != null) {
+                        val matchedSubModeKey = (imeLayoutElement as? JsonObject)?.let { obj ->
+                            subModeCandidates(subModeLabel, schemaId, subModeName)
+                                .firstOrNull { obj[it] != null }
+                        } ?: "default"
+                        "ime:$imeName:$matchedSubModeKey"
+                    } else if (json["default"]?.let { parseLayoutArray(it) } != null) {
+                        "default"
+                    } else {
+                        "builtin"
+                    }
+                } else if (json["default"]?.let { parseLayoutArray(it) } != null) {
+                    "default"
+                } else {
+                    "builtin"
+                }
+            }
+            json?.get("default")?.let { parseLayoutArray(it) } != null -> "default"
+            else -> "builtin"
+        }
+        return buildString {
+            append(branch)
+            append('|').append(showLangSwitch)
+            append('|').append(contextKey)
+            append('|').append(lastRawModified)
+        }
     }
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
