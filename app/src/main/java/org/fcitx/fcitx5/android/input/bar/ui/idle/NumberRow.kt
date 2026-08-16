@@ -20,6 +20,8 @@ import kotlin.math.abs
 @SuppressLint("ViewConstructor")
 class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, ::Layout, { null }) {
 
+    override fun currentLayoutSignature(): String = "NumberRow"
+
     private var gestureStartEvent: MotionEvent? = null
     private var collapseGestureTriggered: Boolean = false
 

@@ -43,6 +43,8 @@ import splitties.views.imageResource
 class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout(context) {
 
     class Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, ::Layout, { null }) {
+        override fun currentLayoutSignature(): String = "ExpandedCandidate"
+
         companion object {
             const val UpBtnLabel = "U"
             const val DownBtnLabel = "D"

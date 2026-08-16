@@ -181,8 +181,15 @@ abstract class BaseKeyboard(
     // press (macrokey "layer to" or shift-based language switching) is the dominant source
     // of input latency; reusing prebuilt rows skips the expensive view construction entirely.
     // NOTE: must be declared before the init block, which triggers the first reloadLayout().
-    private val reusableRowsCache = HashMap<String, ReusableRows>()
+    private val reusableRowsCache = object : LinkedHashMap<String, ReusableRows>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, ReusableRows>): Boolean =
+            size > MAX_CACHED_ROWS
+    }
     private var lastRowsSignature: String? = null
+
+    private companion object {
+        const val MAX_CACHED_ROWS = 12
+    }
 
     private var lastSplitLandscapeState = false
 
@@ -221,10 +228,11 @@ abstract class BaseKeyboard(
 
     /**
      * Signature identifying the semantic keyboard content (layer, input method, sub mode, ...).
-     * Subclasses rendering different KeyDef sets must override this so cached rows are never
-     * reused across different layouts.
+     * Every subclass must implement this so cached rows are never reused across different
+     * layouts. For static layouts a constant identifying the layout is sufficient; layouts
+     * that change at runtime must derive the signature from the resolved layout inputs.
      */
-    protected open fun currentLayoutSignature(): String = ""
+    protected abstract fun currentLayoutSignature(): String
 
     private fun currentRowsSignature(splitKeyboard: Boolean): String {
         val prefs = ThemeManager.prefs
@@ -242,6 +250,8 @@ abstract class BaseKeyboard(
                 .append(",").append(prefs.keyHorizontalMarginLandscape.getValue())
             append("|vMargins:").append(prefs.keyVerticalMargin.getValue())
                 .append(",").append(prefs.keyVerticalMarginLandscape.getValue())
+            append("|expandKeys:").append(AppPrefs.getInstance().keyboard.expandKeypressArea.getValue())
+            append("|splitGap:").append(splitKeyboardManager.getSplitGapPercent())
             append("|fontRefresh:").append(FontProviders.needsRefresh())
         }
     }
@@ -250,20 +260,31 @@ abstract class BaseKeyboard(
      * Re-register keyboard-level state for a reused row set. KeyViews keep the gesture
      * configuration they were built with, so only the registries rebuilt on every reload
      * (space keys, compose-aware keys) need to be repopulated.
+     *
+     * Validate every row before changing either registry. This keeps a stale cache entry
+     * from leaving partially registered state behind when the caller falls back to a rebuild.
      */
-    private fun registerReusableRowState(rows: List<List<KeyDef>>, containers: List<ConstraintLayout>) {
+    private fun registerReusableRowState(rows: List<List<KeyDef>>, containers: List<ConstraintLayout>): Boolean {
+        val validatedRows = ArrayList<List<Pair<KeyDef, KeyView>>>(rows.size)
         rows.forEachIndexed { rowIndex, rowDefs ->
-            val container = containers.getOrNull(rowIndex) ?: return@forEachIndexed
+            val container = containers.getOrNull(rowIndex) ?: return false
             val keyViews = container.children.mapNotNull { it as? KeyView }.toList()
+            if (keyViews.size != rowDefs.size) return false
+            val validatedRow = ArrayList<Pair<KeyDef, KeyView>>(rowDefs.size)
             rowDefs.forEachIndexed { keyIndex, def ->
-                val keyView = keyViews.getOrNull(keyIndex) ?: return@forEachIndexed
-                // Only register when the reused view really belongs to this def;
-                // when in doubt, skip to avoid wiring the wrong def to the view.
+                val keyView = keyViews[keyIndex]
                 val matchesDef = keyView.def === def.appearance ||
                     def.composeOverride?.appearance === keyView.def
-                if (!matchesDef) return@forEachIndexed
-                if (def is SpaceKey || def is MiniSpaceKey) {
-                    if (!spaceKeys.contains(keyView)) spaceKeys.add(keyView)
+                if (!matchesDef) return false
+                validatedRow += def to keyView
+            }
+            validatedRows += validatedRow
+        }
+
+        validatedRows.forEach { row ->
+            row.forEach { (def, keyView) ->
+                if (def is SpaceKey && !spaceKeys.contains(keyView)) {
+                    spaceKeys.add(keyView)
                 }
                 if (def.composeOverride != null) {
                     composeAwareKeys += ComposeAwareKey(
@@ -280,6 +301,7 @@ abstract class BaseKeyboard(
                 }
             }
         }
+        return true
     }
 
     protected open fun reloadLayout() {
@@ -312,8 +334,9 @@ abstract class BaseKeyboard(
         // Reuse only when the cached rows were built from the exact same KeyDef instances;
         // providers that re-create defs on every call (e.g. the builtin fallback layout)
         // then rebuild instead of silently re-registering mismatched state.
-        keyRows = if (cachedRows != null && cachedRows.defs === rows) {
+        keyRows = if (cachedRows != null && cachedRows.defs === rows &&
             registerReusableRowState(rows, cachedRows.containers)
+        ) {
             cachedRows.containers
         } else {
             val built = rows.map { row ->
@@ -326,9 +349,6 @@ abstract class BaseKeyboard(
                 } else {
                     buildRegularRow(row, keyViews)
                 }
-            }
-            if (reusableRowsCache.size >= 12) {
-                reusableRowsCache.clear()
             }
             reusableRowsCache[rowsSignature] = ReusableRows(rows, built)
             built

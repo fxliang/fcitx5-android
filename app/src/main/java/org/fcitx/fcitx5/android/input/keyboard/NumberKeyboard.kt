@@ -19,6 +19,8 @@ class NumberKeyboard(
     theme: Theme,
 ) : BaseKeyboard(context, theme, ::Layout, { null }) {
 
+    override fun currentLayoutSignature(): String = Name
+
     companion object {
         const val Name = "Number"
 

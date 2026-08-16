@@ -41,6 +41,8 @@ class PickerLayout(context: Context, theme: Theme, switchKey: KeyDef) :
         )}
     ) {
 
+        override fun currentLayoutSignature(): String = "Picker"
+
         class PunctuationKey(val symbol: String) : KeyDef(
             Appearance.Text(
                 displayText = symbol,
