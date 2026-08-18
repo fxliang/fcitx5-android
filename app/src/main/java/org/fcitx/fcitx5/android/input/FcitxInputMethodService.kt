@@ -104,6 +104,13 @@ import splitties.resources.styledColor
 import timber.log.Timber
 import kotlin.math.max
 
+/**
+ * All numpad key codes, from [KeyEvent.KEYCODE_NUMPAD_0] to [KeyEvent.KEYCODE_NUMPAD_RIGHT_PAREN].
+ * For these keys the simulated key events always carry [KeyEvent.META_NUM_LOCK_ON] so that
+ * Android KeyCharacterMap resolves the digit/symbol characters instead of navigation keys.
+ */
+private val NUMPAD_KEYCODE_RANGE = KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_RIGHT_PAREN
+
 class FcitxInputMethodService : LifecycleInputMethodService() {
 
     internal lateinit var fcitx: FcitxConnection
@@ -1267,10 +1274,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    private fun simulatedMetaState(): Int {
+    private fun simulatedMetaState(keyCode: Int): Int {
         var metaState = 0
         if (simulatedCapsLockOn) metaState = metaState or KeyEvent.META_CAPS_LOCK_ON
-        if (simulatedNumLockOn) metaState = metaState or KeyEvent.META_NUM_LOCK_ON
+        // Num lock is always treated as ON for numpad keys from the simulated keyboard,
+        // so that Android KeyCharacterMap produces the correct digit/symbol unicode
+        // characters instead of converting them to navigation keys.
+        if (simulatedNumLockOn || keyCode in NUMPAD_KEYCODE_RANGE) {
+            metaState = metaState or KeyEvent.META_NUM_LOCK_ON
+        }
         if (simulatedShiftPressedCount > 0) metaState = metaState or KeyEvent.META_SHIFT_ON
         if (simulatedCtrlPressedCount > 0) metaState = metaState or KeyEvent.META_CTRL_ON
         if (simulatedAltPressedCount > 0) metaState = metaState or KeyEvent.META_ALT_ON
@@ -1297,7 +1309,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 action,
                 keyCode,
                 0,
-                simulatedMetaState(),
+                simulatedMetaState(keyCode),
                 KeyCharacterMap.VIRTUAL_KEYBOARD,
                 scanCode,
                 KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
@@ -1319,7 +1331,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else if (action == KeyEvent.ACTION_UP) {
             updateSimulatedModifierCount(keyCode, action)
         }
-        val metaState = simulatedMetaState()
+        val metaState = simulatedMetaState(keyCode)
         // Use InputDevice.SOURCE_KEYBOARD so the system uses the physical keyboard KeyCharacterMap
         // This makes function keys (F1-F12) return unicodeChar = 0 and follow the keyCodeToSym path
         val event = KeyEvent(

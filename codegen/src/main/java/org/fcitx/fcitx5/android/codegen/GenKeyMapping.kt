@@ -180,6 +180,8 @@ internal class GenKeyMappingProcessor(private val environment: SymbolProcessorEn
         "KP_Enter" to 0xff8d to "KEYCODE_NUMPAD_ENTER",
         "KP_0" to 0xffb0 to "KEYCODE_NUMPAD_0",
         "KP_Decimal" to 0xffae to "KEYCODE_NUMPAD_DOT",
+        "KP_Separator" to 0xffac to "KEYCODE_NUMPAD_COMMA",
+        "KP_Equal" to 0xffbd to "KEYCODE_NUMPAD_EQUALS",
 
         "Eisu_toggle" to 0xff30 to "KEYCODE_EISU", // FcitxKey_Eisu_toggle
         "Kana_Lock" to 0xff2d to "KEYCODE_KANA", // FcitxKey_Kana_Lock
