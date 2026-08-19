@@ -570,6 +570,8 @@
     <string name="text_keyboard_layout_key_color_monet_unavailable">当前设备不支持 Monet 动态颜色</string>
     <string name="text_keyboard_layout_layout_name">布局名称</string>
     <string name="text_keyboard_layout_layout_name_hint">例如：rime、pinyin</string>
+    <string name="numeric_layout_override_title">数字键盘布局</string>
+    <string name="numeric_layout_override_builtin">内置数字键盘</string>
     <string name="text_keyboard_layout_copy_from">从现有布局复制</string>
     <string name="text_keyboard_layout_name_empty">布局名称不能为空</string>
     <string name="text_keyboard_layout_delete_key_confirm">删除这个按键？</string>

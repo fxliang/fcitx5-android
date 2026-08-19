@@ -395,13 +395,27 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
-        clearAllLayerOverrides()
+        // Clear latched/one-shot layer state and the BACK layer history; the forced layout
+        // slot is updated in one pass by TextKeyboard.setNumericLayoutKey below.
+        latchedLayerKey = null
+        oneShotLayerKey = null
+        layerHistory.clear()
+        noConfigAuxBarFallbackActive = false
         preeditEmpty = true
         candidateEmpty = true
         composingState = false
-        val targetLayout = when (info.inputType and InputType.TYPE_MASK_CLASS) {
-            InputType.TYPE_CLASS_NUMBER -> NumberKeyboard.Name
-            InputType.TYPE_CLASS_PHONE -> NumberKeyboard.Name
+        val inputClass = info.inputType and InputType.TYPE_MASK_CLASS
+        val isNumericClass = inputClass == InputType.TYPE_CLASS_NUMBER ||
+            inputClass == InputType.TYPE_CLASS_PHONE
+        // Numeric editors short-circuit the built-in number keyboard when the app
+        // preference "numeric_layout_override" names a resolvable custom layout. PIN-style
+        // numeric password fields are included; their candidate bar stays empty via the
+        // Password capability flag, mirroring text password fields.
+        val numericLayoutKey = if (isNumericClass) TextKeyboard.resolveNumericLayoutKey() else null
+        TextKeyboard.setNumericLayoutKey(numericLayoutKey)
+        val targetLayout = when {
+            numericLayoutKey != null -> TextKeyboard.Name
+            isNumericClass -> NumberKeyboard.Name
             else -> TextKeyboard.Name
         }
         switchLayout(targetLayout, remember = false, inheritTextHeight = false)

@@ -122,6 +122,7 @@ class TextKeyboard(
         private val cachedAuxBarConfigs = mutableMapOf<String, AuxBarConfig?>()
         private var lastLayoutCacheInvalidated = 0L
         private var forcedLayoutKey: String? = null
+        private var numericLayoutKey: String? = null
         var resolvedAuxBarConfig: AuxBarConfig? = null
         var resolvedAuxBarKeys: List<Map<String, Any?>> = emptyList()
 
@@ -134,14 +135,18 @@ class TextKeyboard(
             lastLayoutCacheInvalidated = 0L
         }
 
+        /**
+         * Force a latched/one-shot layer, or clear it (falling back to the numeric-input
+         * layout when one is active). The numeric layout is configured per input session
+         * by [setNumericLayoutKey], so input method updates that clear layer latches keep
+         * the numeric editor on its layout.
+         */
         @Synchronized
         fun setForcedLayoutKey(layoutKey: String?) {
-            val normalized = layoutKey?.trim()?.takeIf { it.isNotEmpty() }
+            val normalized = layoutKey?.trim()?.takeIf { it.isNotEmpty() } ?: numericLayoutKey
             if (forcedLayoutKey == normalized) return
             forcedLayoutKey = normalized
-            val living = attachedKeyboards.mapNotNull { it.get() }
-            attachedKeyboards.removeAll { it.get() == null }
-            living.forEach { keyboard ->
+            forEachAttachedKeyboard { keyboard ->
                 keyboard.refreshStyle()
                 keyboard.markLayoutSignatureApplied()
                 ime?.let { keyboard.updateSpaceLabel(it) }
@@ -150,6 +155,50 @@ class TextKeyboard(
 
         @Synchronized
         fun clearForcedLayoutKey() = setForcedLayoutKey(null)
+
+        /**
+         * Set the layout used for numeric-only editors of the current input session
+         * (resolved from the numeric_layout_override preference). Called from
+         * [KeyboardWindow.onStartInput] after layer latches have been cleared, so a single
+         * update covers both transitions. `null` restores the default resolution path.
+         */
+        @Synchronized
+        fun setNumericLayoutKey(layoutKey: String?) {
+            val normalized = layoutKey?.trim()?.takeIf { it.isNotEmpty() }
+            if (numericLayoutKey == normalized && forcedLayoutKey == normalized) return
+            numericLayoutKey = normalized
+            // Latched layers were just cleared by the caller; the forced slot now carries
+            // the numeric layout and keeps falling back to it for the rest of the session.
+            forcedLayoutKey = normalized
+            forEachAttachedKeyboard { keyboard ->
+                keyboard.refreshStyle()
+                keyboard.markLayoutSignatureApplied()
+                ime?.let { keyboard.updateSpaceLabel(it) }
+            }
+        }
+
+        @Synchronized
+        private fun forEachAttachedKeyboard(action: (TextKeyboard) -> Unit) {
+            val living = attachedKeyboards.mapNotNull { it.get() }
+            attachedKeyboards.removeAll { it.get() == null }
+            living.forEach(action)
+        }
+
+        /**
+         * Resolve the layout used for numeric-only editors from the app preference
+         * "numeric_layout_override" (键盘 → 数字键盘布局). The preference names any
+         * layout key, including IME submode keys such as "rime:wanxiang"; users are
+         * responsible for the value. Returns null when unset or unresolvable, in which
+         * case the built-in number keyboard applies. Deliberately decoupled from the
+         * layout JSON: TextKeyboardLayout.json only defines text keyboard layouts.
+         */
+        @Synchronized
+        fun resolveNumericLayoutKey(): String? {
+            val json = textLayoutJson ?: return null
+            val option = AppPrefs.getInstance().keyboard.numericLayoutOverride.getValue()
+                .trim().takeIf { it.isNotEmpty() } ?: return null
+            return option.takeIf { containsLayoutKey(json, it) }
+        }
 
         @Synchronized
         fun currentLayoutHeightPercentOverride(): Int? {

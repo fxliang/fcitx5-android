@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.ui.main.settings.behavior
 
 import android.content.Intent
 import android.net.Uri
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.activityViewModels
 import androidx.preference.Preference
 import androidx.preference.PreferenceScreen
@@ -16,6 +17,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.input.config.ConfigProviders
 import org.fcitx.fcitx5.android.input.config.UserConfigFiles
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.data.LayoutDataManager
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.webeditor.ImeWebEditorBridgeServer
 
 /**
@@ -31,6 +33,7 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
     private var calibrationPreference: Preference? = null
     private var textLayoutFileSelectPreference: Preference? = null
     private var webEditorBridgePreference: Preference? = null
+    private var numericLayoutOverridePreference: Preference? = null
 
     private val onSplitEnabledChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
         if (key == "split_keyboard_enabled") {
@@ -91,6 +94,11 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
                 buildCurrentTextLayoutFileSummary()
             ) { showSelectTextLayoutFileDialog() }
 
+            numericLayoutOverridePreference = addTool(screen, "tool_numeric_layout_override",
+                R.string.numeric_layout_override_title,
+                buildNumericLayoutOverrideSummary()
+            ) { showNumericLayoutOverrideDialog() }
+
             webEditorBridgePreference = addTool(screen, "tool_web_editor_bridge",
                 R.string.web_editor_bridge_title, ""
             ) { toggleWebEditorBridge() }
@@ -109,6 +117,7 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
         viewModel.setToolbarTitle(getString(groupTitleRes(group)))
         if (group == GROUP_EDITORS) {
             textLayoutFileSelectPreference?.summary = buildCurrentTextLayoutFileSummary()
+            numericLayoutOverridePreference?.summary = buildNumericLayoutOverrideSummary()
             updateWebEditorBridgeStatus()
         }
     }
@@ -153,6 +162,44 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
     private fun displayProfile(profile: String) =
         if (profile == UserConfigFiles.DEFAULT_TEXT_KEYBOARD_LAYOUT_PROFILE)
             getString(R.string.default_) else profile
+
+    private fun buildNumericLayoutOverrideSummary(): String {
+        val value = AppPrefs.getInstance().keyboard.numericLayoutOverride.getValue().trim()
+        return if (value.isEmpty()) getString(R.string.numeric_layout_override_builtin) else value
+    }
+
+    /**
+     * 列出当前启用的布局文件中的层：基础布局与 ime:submode 子布局。
+     * 复用布局编辑器（LayoutDataManager.parseJsonText）的解析逻辑，与编辑页
+     * 下拉框枚举的层完全一致。
+     */
+    private fun collectLayoutLayerEntries(): List<String> {
+        val file = ConfigProviders.provider.textKeyboardLayoutFile() ?: return emptyList()
+        val text = runCatching { file.readText() }.getOrNull() ?: return emptyList()
+        val parsed = runCatching {
+            LayoutDataManager(requireContext()).parseJsonText(text, file.name, fallbackToDefault = false)
+        }.getOrNull() ?: return emptyList()
+        return parsed.keys.sorted()
+    }
+
+    private fun showNumericLayoutOverrideDialog() {
+        val builtin = getString(R.string.numeric_layout_override_builtin)
+        val layers = collectLayoutLayerEntries()
+        val items = listOf(builtin) + layers
+        val current = AppPrefs.getInstance().keyboard.numericLayoutOverride.getValue().trim()
+        val checked = if (current.isEmpty()) 0 else items.indexOf(current).coerceAtLeast(0)
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.numeric_layout_override_title)
+            .setSingleChoiceItems(items.toTypedArray(), checked) { dialog, which ->
+                AppPrefs.getInstance().keyboard.numericLayoutOverride
+                    .setValue(if (which == 0) "" else items[which])
+                numericLayoutOverridePreference?.summary = buildNumericLayoutOverrideSummary()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+            .show()
+    }
 
     private fun showSelectTextLayoutFileDialog() {
         val profiles = UserConfigFiles.listTextKeyboardLayoutProfiles().toMutableList()

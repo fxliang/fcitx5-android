@@ -245,6 +245,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             "text_keyboard_layout_profile",
             "default"
         ).apply { register() }
+        /**
+         * 数字输入框使用的自定义布局键（可为任意布局名或 ime:submode，如 rime:wanxiang）。
+         * 留空表示使用内置数字键盘。仅存于应用设置，与布局文件解耦。
+         */
+        val numericLayoutOverride = ManagedPreference.PString(
+            sharedPreferences,
+            "numeric_layout_override",
+            ""
+        ).apply { register() }
         val langSwitchKeyBehavior = enumList(
             R.string.lang_switch_key_behavior,
             "lang_switch_key_behavior",

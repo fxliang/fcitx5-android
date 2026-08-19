@@ -105,7 +105,10 @@ value class CapabilityFlags constructor(val flags: ULong) {
                 }
             }
             info.inputType.let {
-                when (it and InputType.TYPE_MASK_CLASS) {
+                val inputClass = it and InputType.TYPE_MASK_CLASS
+                val numericPasswordVariation =
+                    (it and InputType.TYPE_MASK_VARIATION) == InputType.TYPE_NUMBER_VARIATION_PASSWORD
+                when (inputClass) {
                     InputType.TYPE_NULL -> {
                         flags -= CapabilityFlag.Preedit
                         flags += CapabilityFlag.NoSpellCheck
@@ -174,6 +177,14 @@ value class CapabilityFlags constructor(val flags: ULong) {
                             }
                         }
                     }
+                }
+                // PIN-style numeric password fields (number or phone class carrying the
+                // number-password variation) suppress candidates the same way as text
+                // password fields: fcitx empties the candidate bar for the Password flag.
+                if ((inputClass == InputType.TYPE_CLASS_NUMBER ||
+                        inputClass == InputType.TYPE_CLASS_PHONE) && numericPasswordVariation
+                ) {
+                    flags += CapabilityFlag.Password
                 }
             }
             return CapabilityFlags(flags)
