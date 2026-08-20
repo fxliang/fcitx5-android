@@ -34,6 +34,12 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
     private var textLayoutFileSelectPreference: Preference? = null
     private var webEditorBridgePreference: Preference? = null
     private var numericLayoutOverridePreference: Preference? = null
+    private data class LayoutLayerCache(
+        val path: String?,
+        val lastModified: Long,
+        val layers: List<String>
+    )
+    private var layoutLayerCache: LayoutLayerCache? = null
 
     private val onSplitEnabledChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
         if (key == "split_keyboard_enabled") {
@@ -180,11 +186,18 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
      */
     private fun collectLayoutLayerEntries(): List<String> {
         val file = ConfigProviders.provider.textKeyboardLayoutFile() ?: return emptyList()
+        val path = file.absolutePath
+        val lastModified = file.takeIf { it.exists() }?.lastModified() ?: 0L
+        layoutLayerCache?.takeIf {
+            it.path == path && it.lastModified == lastModified
+        }?.let { return it.layers }
         val text = runCatching { file.readText() }.getOrNull() ?: return emptyList()
         val parsed = runCatching {
             LayoutDataManager(requireContext()).parseJsonText(text, file.name, fallbackToDefault = false)
         }.getOrNull() ?: return emptyList()
-        return parsed.keys.sorted()
+        return parsed.keys.sorted().also {
+            layoutLayerCache = LayoutLayerCache(path, lastModified, it)
+        }
     }
 
     private fun showNumericLayoutOverrideDialog() {

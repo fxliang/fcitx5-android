@@ -29,6 +29,10 @@ import kotlinx.serialization.json.*
 import kotlinx.serialization.Serializable
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.utils.LayoutJsonUtils
 
+internal fun interface NumericLayoutFallbackListener {
+    fun onNumericLayoutOverrideInvalidated()
+}
+
 @SuppressLint("ViewConstructor")
 class TextKeyboard(
     context: Context,
@@ -72,22 +76,12 @@ class TextKeyboard(
 
         @Synchronized
         private fun onTextLayoutFileChanged() {
-            cachedRawLayoutJson = null
-            lastRawModified = 0L
-            lastRawLayoutFile = null
-            // The layout profile may have changed mid-session. A numeric override resolved
-            // at the last onStartInput can reference a layout that no longer exists (or now
-            // means something else); re-validate it so numeric editors do not silently keep
-            // rendering the wrong layout.
-            val droppedOverride = revalidateNumericLayoutOverride()
+            handleLayoutSourceChanged()
             val living = attachedKeyboards.mapNotNull { it.get() }
             attachedKeyboards.removeAll { it.get() == null }
             living.forEach { keyboard ->
                 keyboard.refreshStyle()
                 ime?.let { keyboard.updateSpaceLabel(it) }
-            }
-            if (droppedOverride) {
-                numericLayoutFallbackTarget?.get()?.fallbackToNumberKeyboard()
             }
         }
 
@@ -130,8 +124,8 @@ class TextKeyboard(
         private val cachedAuxBarConfigs = mutableMapOf<String, AuxBarConfig?>()
         private var lastLayoutCacheInvalidated = 0L
         private var forcedLayoutKey: String? = null
-        private var numericLayoutKey: String? = null
-        private var numericLayoutFallbackTarget: WeakReference<KeyboardWindow>? = null
+        private val numericOverride = NumericLayoutOverrideController()
+        private var numericLayoutFallbackTarget: WeakReference<NumericLayoutFallbackListener>? = null
         var resolvedAuxBarConfig: AuxBarConfig? = null
         var resolvedAuxBarKeys: List<Map<String, Any?>> = emptyList()
 
@@ -152,7 +146,8 @@ class TextKeyboard(
          */
         @Synchronized
         fun setForcedLayoutKey(layoutKey: String?) {
-            val normalized = layoutKey?.trim()?.takeIf { it.isNotEmpty() } ?: numericLayoutKey
+            numericOverride.force(layoutKey)
+            val normalized = numericOverride.forcedKey
             if (forcedLayoutKey == normalized) return
             forcedLayoutKey = normalized
             forEachAttachedKeyboard { keyboard ->
@@ -165,6 +160,20 @@ class TextKeyboard(
         @Synchronized
         fun clearForcedLayoutKey() = setForcedLayoutKey(null)
 
+        @Synchronized
+        fun activateManualNumericLayout(layoutKey: String): Boolean {
+            val wasActive = numericOverride.activateManual(layoutKey)
+            setForcedLayoutKey(layoutKey)
+            return wasActive
+        }
+
+        @Synchronized
+        fun releaseManualNumericLayout(): Boolean {
+            if (!numericOverride.releaseManual()) return false
+            setForcedLayoutKey(null)
+            return true
+        }
+
         /**
          * Set the layout used for numeric-only editors of the current input session
          * (resolved from the numeric_layout_override preference). Called from
@@ -174,8 +183,8 @@ class TextKeyboard(
         @Synchronized
         fun setNumericLayoutKey(layoutKey: String?) {
             val normalized = layoutKey?.trim()?.takeIf { it.isNotEmpty() }
-            if (numericLayoutKey == normalized && forcedLayoutKey == normalized) return
-            numericLayoutKey = normalized
+            if (numericOverride.sessionKey == normalized && forcedLayoutKey == normalized) return
+            numericOverride.beginSession(normalized)
             // Latched layers were just cleared by the caller; the forced slot now carries
             // the numeric layout and keeps falling back to it for the rest of the session.
             forcedLayoutKey = normalized
@@ -200,7 +209,7 @@ class TextKeyboard(
          * text keyboard so the override applies uniformly no matter how it is reached.
          */
         @Synchronized
-        fun isNumericLayoutActive(): Boolean = numericLayoutKey != null
+        fun isNumericLayoutActive(): Boolean = numericOverride.sessionKey != null
 
         /**
          * Release the numeric-input layout override for the rest of the current session,
@@ -212,8 +221,8 @@ class TextKeyboard(
          */
         @Synchronized
         fun dismissNumericLayoutOverride() {
-            if (numericLayoutKey == null && forcedLayoutKey == null) return
-            numericLayoutKey = null
+            if (numericOverride.sessionKey == null && forcedLayoutKey == null) return
+            numericOverride.dismiss()
             forcedLayoutKey = null
             forEachAttachedKeyboard { keyboard ->
                 keyboard.refreshStyle()
@@ -254,22 +263,29 @@ class TextKeyboard(
          */
         @Synchronized
         fun revalidateNumericLayoutOverride(): Boolean {
-            val current = numericLayoutKey ?: return false
+            val current = numericOverride.sessionKey ?: return false
             val resolved = resolveNumericLayoutKey()
             if (resolved == current) return false
-            val dropped = resolved == null
-            numericLayoutKey = resolved
-            // Only update the forced slot when it still carries the numeric override; a
-            // latched/one-shot layer may have superseded it for the rest of the session.
-            if (forcedLayoutKey == current) {
-                forcedLayoutKey = resolved
-            }
+            val dropped = numericOverride.revalidate(resolved)
+            if (forcedLayoutKey == current) forcedLayoutKey = numericOverride.forcedKey
             return dropped
         }
 
         @Synchronized
-        fun setNumericLayoutFallbackTarget(window: KeyboardWindow?) {
-            numericLayoutFallbackTarget = window?.let(::WeakReference)
+        fun handleLayoutSourceChanged(): Boolean {
+            cachedRawLayoutJson = null
+            lastRawModified = 0L
+            lastRawLayoutFile = null
+            val droppedOverride = revalidateNumericLayoutOverride()
+            if (droppedOverride) {
+                numericLayoutFallbackTarget?.get()?.onNumericLayoutOverrideInvalidated()
+            }
+            return droppedOverride
+        }
+
+        @Synchronized
+        internal fun setNumericLayoutFallbackTarget(listener: NumericLayoutFallbackListener?) {
+            numericLayoutFallbackTarget = listener?.let(::WeakReference)
         }
 
         @Synchronized

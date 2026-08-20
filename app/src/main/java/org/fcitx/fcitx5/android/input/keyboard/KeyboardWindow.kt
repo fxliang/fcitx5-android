@@ -41,7 +41,7 @@ import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 
 class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), EssentialWindow,
-    InputBroadcastReceiver {
+    InputBroadcastReceiver, NumericLayoutFallbackListener {
 
     private val service by manager.inputMethodService()
     private val fcitx by manager.fcitx()
@@ -61,7 +61,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         TextKeyboard.setNumericLayoutFallbackTarget(this)
     }
 
-    internal fun fallbackToNumberKeyboard() {
+    override fun onNumericLayoutOverrideInvalidated() {
         if (currentKeyboardName == TextKeyboard.Name) {
             switchLayout(NumberKeyboard.Name, remember = false, inheritTextHeight = false)
         }
@@ -112,7 +112,6 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private var oneShotLayerKey: String? = null
     private val layerHistory = ArrayDeque<String>()
     private var noConfigAuxBarFallbackActive = false
-    private var manualNumericOverride = false
     private var companionHeightPercentOverride: Int? = null
     private var companionHeightPxOverride: Int? = null
 
@@ -148,11 +147,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         // A layout profile switch can invalidate the numeric-input override resolved at the
         // last onStartInput. Drop it first so the refresh below does not render the stale
         // (or now-different) layout, and fall back to the built-in number keyboard.
-        val droppedOverride = TextKeyboard.revalidateNumericLayoutOverride()
+        TextKeyboard.handleLayoutSourceChanged()
         keyboards.values.forEach { it.refreshStyle() }
-        if (droppedOverride && currentKeyboardName == TextKeyboard.Name) {
-            switchLayout(NumberKeyboard.Name, remember = false, inheritTextHeight = false)
-        }
         reapplyReturnKeyDrawable()
     }
 
@@ -264,19 +260,15 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             val override = TextKeyboard.resolveNumericLayoutKey()
             if (override != null) {
                 target = TextKeyboard.Name
-                if (!TextKeyboard.isNumericLayoutActive()) {
-                    manualNumericOverride = true
-                }
-                TextKeyboard.setForcedLayoutKey(override)
+                TextKeyboard.activateManualNumericLayout(override)
             }
         } else if (target == TextKeyboard.Name && fromUserKey && TextKeyboard.isNumericLayoutActive()) {
             // An explicit key in the numeric layout targets the text keyboard (e.g. an
             // "ABC"-style LayoutSwitchKey in the custom numeric layout). Release the
             // override for the rest of the session so the normal text keyboard shows.
             TextKeyboard.dismissNumericLayoutOverride()
-        } else if (target == TextKeyboard.Name && manualNumericOverride) {
-            manualNumericOverride = false
-            TextKeyboard.clearForcedLayoutKey()
+        } else if (target == TextKeyboard.Name) {
+            TextKeyboard.releaseManualNumericLayout()
         }
         ContextCompat.getMainExecutor(service).execute {
             if (target == TextKeyboard.Name || target == NumberKeyboard.Name) {
@@ -449,7 +441,6 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         oneShotLayerKey = null
         layerHistory.clear()
         noConfigAuxBarFallbackActive = false
-        manualNumericOverride = false
         preeditEmpty = true
         candidateEmpty = true
         composingState = false
