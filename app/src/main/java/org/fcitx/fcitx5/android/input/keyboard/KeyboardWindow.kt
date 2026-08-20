@@ -277,9 +277,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             } else {
                 TextKeyboard.releaseManualNumericLayout()
             }
-        } else if (target == TextKeyboard.Name) {
-            TextKeyboard.releaseManualNumericLayout()
         }
+        // Note: an internal Text -> Text switch (layer relayout, one-shot consumption,
+        // onStartInput) must NOT release the manual numeric layout here: the layer latch
+        // was applied moments before via applyEffectiveTextLayer and releasing would
+        // clobber it back to the session fallback.
         ContextCompat.getMainExecutor(service).execute {
             if (target == TextKeyboard.Name || target == NumberKeyboard.Name) {
                 if (target == TextKeyboard.Name) {
