@@ -605,6 +605,7 @@
     <string name="text_keyboard_layout_editing_default">正在编辑"%1$s"的默认布局</string>
     <string name="text_keyboard_layout_key_label_lang">Lang</string>
     <string name="text_keyboard_layout_key_label_space">Space</string>
+    <string name="text_keyboard_layout_key_label_minispace">␣</string>
     <string name="text_keyboard_layout_key_label_enter">Enter</string>
     <string name="text_keyboard_layout_alphabet_key_main_required">主字符不能为空</string>
     <string name="text_keyboard_layout_alphabet_key_alt_required">副字符不能为空</string>
@@ -621,6 +622,12 @@
     <string name="text_keyboard_layout_macro_event_preview">%1$s → … (共 %2$d 步)</string>
     <string name="text_keyboard_layout_alt_label">副标签</string>
     <string name="text_keyboard_layout_swipe_label">划动标签</string>
+    <string name="text_keyboard_layout_switch_target">目标</string>
+    <string name="text_keyboard_layout_switch_target_default">默认（?123 / 上次符号布局）</string>
+    <string name="text_keyboard_layout_switch_target_text">文本键盘</string>
+    <string name="text_keyboard_layout_switch_target_number">数字键盘</string>
+    <string name="text_keyboard_layout_switch_target_symbol">符号选择器</string>
+    <string name="text_keyboard_layout_numpad_symbol">数字键盘符号</string>
     <string name="text_keyboard_layout_validation_error">验证错误</string>
 
     <!-- Macro Editor -->

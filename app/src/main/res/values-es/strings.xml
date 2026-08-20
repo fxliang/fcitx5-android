@@ -227,6 +227,7 @@
     <string name="text_keyboard_layout_key_label_caps">Caps</string>
     <string name="text_keyboard_layout_key_label_lang">Lang</string>
     <string name="text_keyboard_layout_key_label_space">Space</string>
+    <string name="text_keyboard_layout_key_label_minispace">␣</string>
     <string name="text_keyboard_layout_key_label_enter">Enter</string>
     <string name="space_key_label_mode">Estilo de etiqueta de la barra espaciadora</string>
     <string name="space_key_label_mode_default">Predeterminado</string>
@@ -348,6 +349,12 @@
     <string name="text_keyboard_layout_macro_event_preview">%1$s → … (%2$d pasos en total)</string>
     <string name="text_keyboard_layout_alt_label">Etiqueta alternativa</string>
     <string name="text_keyboard_layout_swipe_label">Etiqueta de deslizamiento</string>
+    <string name="text_keyboard_layout_switch_target">Destino</string>
+    <string name="text_keyboard_layout_switch_target_default">Predeterminado (?123 / último diseño de símbolos)</string>
+    <string name="text_keyboard_layout_switch_target_text">Teclado de texto</string>
+    <string name="text_keyboard_layout_switch_target_number">Teclado numérico</string>
+    <string name="text_keyboard_layout_switch_target_symbol">Selector de símbolos</string>
+    <string name="text_keyboard_layout_numpad_symbol">Símbolo del teclado numérico</string>
 
     <!-- Macro Editor -->
     <string name="macro_editor_title">Editar %1$s</string>

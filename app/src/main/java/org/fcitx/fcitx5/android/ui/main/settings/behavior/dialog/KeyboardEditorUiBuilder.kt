@@ -18,6 +18,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import splitties.dimensions.dp
 import splitties.resources.styledColor
 
@@ -26,6 +27,19 @@ import splitties.resources.styledColor
  * for the keyboard edit dialog.
  */
 class KeyboardEditorUiBuilder(private val activity: AppCompatActivity) {
+
+    /**
+     * A selectable switch target for [org.fcitx.fcitx5.android.input.keyboard.LayoutSwitchKey].
+     * The value is stored as the key's `subLabel`; an empty value selects the default
+     * behavior (last symbol layout, "?123").
+     */
+    data class SwitchTargetOption(val value: String, val labelRes: Int)
+
+    /**
+     * A selectable numpad symbol for [org.fcitx.fcitx5.android.input.keyboard.NumPadKey].
+     * [sym] is the Fcitx keysym sent with NumLock state on press.
+     */
+    data class NumPadOption(val label: String, val sym: Int)
 
     companion object {
         private const val DIALOG_LABEL_TEXT_SIZE_SP = 13f
@@ -41,7 +55,36 @@ class KeyboardEditorUiBuilder(private val activity: AppCompatActivity) {
             "SymbolKey",
             "ReturnKey",
             "BackspaceKey",
+            "NumPadKey",
+            "MiniSpaceKey",
             "MacroKey"
+        )
+
+        val SWITCH_TARGET_OPTIONS = listOf(
+            SwitchTargetOption("", R.string.text_keyboard_layout_switch_target_default),
+            SwitchTargetOption("Text", R.string.text_keyboard_layout_switch_target_text),
+            SwitchTargetOption("Number", R.string.text_keyboard_layout_switch_target_number),
+            SwitchTargetOption("Symbol", R.string.text_keyboard_layout_switch_target_symbol)
+        )
+
+        val NUMPAD_OPTIONS = listOf(
+            NumPadOption("0", FcitxKeyMapping.FcitxKey_KP_0),
+            NumPadOption("1", FcitxKeyMapping.FcitxKey_KP_1),
+            NumPadOption("2", FcitxKeyMapping.FcitxKey_KP_2),
+            NumPadOption("3", FcitxKeyMapping.FcitxKey_KP_3),
+            NumPadOption("4", FcitxKeyMapping.FcitxKey_KP_4),
+            NumPadOption("5", FcitxKeyMapping.FcitxKey_KP_5),
+            NumPadOption("6", FcitxKeyMapping.FcitxKey_KP_6),
+            NumPadOption("7", FcitxKeyMapping.FcitxKey_KP_7),
+            NumPadOption("8", FcitxKeyMapping.FcitxKey_KP_8),
+            NumPadOption("9", FcitxKeyMapping.FcitxKey_KP_9),
+            NumPadOption("+", FcitxKeyMapping.FcitxKey_KP_Add),
+            NumPadOption("-", FcitxKeyMapping.FcitxKey_KP_Subtract),
+            NumPadOption("*", FcitxKeyMapping.FcitxKey_KP_Multiply),
+            NumPadOption("/", FcitxKeyMapping.FcitxKey_KP_Divide),
+            NumPadOption(",", FcitxKeyMapping.FcitxKey_KP_Separator),
+            NumPadOption(".", FcitxKeyMapping.FcitxKey_KP_Decimal),
+            NumPadOption("=", FcitxKeyMapping.FcitxKey_KP_Equal)
         )
     }
 
@@ -123,6 +166,98 @@ class KeyboardEditorUiBuilder(private val activity: AppCompatActivity) {
         container.addView(labelView)
         container.addView(editText)
         return container to editText
+    }
+
+    /**
+     * Create a dropdown selector for a [LayoutSwitchKey]'s switch target (stored as the
+     * key's `subLabel`). Preselects the entry matching [currentValue]; empty matches the
+     * default option.
+     */
+    fun createSwitchTargetSpinner(
+        container: LinearLayout,
+        currentValue: String
+    ): Spinner {
+        val labelView = TextView(activity).apply {
+            text = activity.getString(R.string.text_keyboard_layout_switch_target)
+            textSize = DIALOG_LABEL_TEXT_SIZE_SP
+            setTextColor(activity.styledColor(android.R.attr.textColorSecondary))
+            layoutParams = LinearLayout.LayoutParams(activity.dp(96), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                rightMargin = activity.dp(8)
+            }
+        }
+        val spinner = Spinner(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                weight = 1f
+            }
+        }
+        val adapter = object : ArrayAdapter<SwitchTargetOption>(
+            activity, android.R.layout.simple_spinner_item, SWITCH_TARGET_OPTIONS
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
+                getItem(position)?.let { option ->
+                    (view as? TextView)?.text = activity.getString(option.labelRes)
+                }
+                return view
+            }
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getDropDownView(position, convertView, parent)
+                getItem(position)?.let { option ->
+                    (view as? TextView)?.text = activity.getString(option.labelRes)
+                }
+                return view
+            }
+        }
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinner.adapter = adapter
+        val position = SWITCH_TARGET_OPTIONS.indexOfFirst { it.value == currentValue }
+        if (position >= 0) spinner.setSelection(position)
+        val row = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, activity.dp(4), 0, activity.dp(4))
+            addView(labelView)
+            addView(spinner)
+        }
+        container.addView(row)
+        return spinner
+    }
+
+    /**
+     * Create a dropdown selector for a [NumPadKey]'s symbol. Preselects the entry whose
+     * keysym matches [currentSym]; an unknown keysym falls back to the first option.
+     */
+    fun createNumPadSymSpinner(
+        container: LinearLayout,
+        currentSym: Int
+    ): Spinner {
+        val labelView = TextView(activity).apply {
+            text = activity.getString(R.string.text_keyboard_layout_numpad_symbol)
+            textSize = DIALOG_LABEL_TEXT_SIZE_SP
+            setTextColor(activity.styledColor(android.R.attr.textColorSecondary))
+            layoutParams = LinearLayout.LayoutParams(activity.dp(96), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                rightMargin = activity.dp(8)
+            }
+        }
+        val spinner = Spinner(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                weight = 1f
+            }
+        }
+        val adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_item, NUMPAD_OPTIONS.map { it.label })
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinner.adapter = adapter
+        val position = NUMPAD_OPTIONS.indexOfFirst { it.sym == currentSym }
+        if (position >= 0) spinner.setSelection(position)
+        val row = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, activity.dp(4), 0, activity.dp(4))
+            addView(labelView)
+            addView(spinner)
+        }
+        container.addView(row)
+        return spinner
     }
 
     /**

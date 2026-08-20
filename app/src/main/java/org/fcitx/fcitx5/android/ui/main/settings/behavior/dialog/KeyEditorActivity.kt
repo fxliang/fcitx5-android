@@ -130,7 +130,11 @@ class KeyEditorActivity : AppCompatActivity() {
     private val alphabetDisplayTextRowBindings = mutableListOf<KeyboardEditorUiBuilder.DisplayTextRowBinding>()
 
     private var layoutSwitchLabelEdit: EditText? = null
+    private var layoutSwitchTargetSpinner: Spinner? = null
     private var layoutSwitchWeightEdit: EditText? = null
+
+    private var numPadLabelEdit: EditText? = null
+    private var numPadSymSpinner: Spinner? = null
 
     private var symbolLabelEdit: EditText? = null
     private var symbolWeightEdit: EditText? = null
@@ -384,7 +388,10 @@ class KeyEditorActivity : AppCompatActivity() {
         alphabetDisplayTextSimpleEdit = null
         alphabetDisplayTextRowBindings.clear()
         layoutSwitchLabelEdit = null
+        layoutSwitchTargetSpinner = null
         layoutSwitchWeightEdit = null
+        numPadLabelEdit = null
+        numPadSymSpinner = null
         symbolLabelEdit = null
         symbolWeightEdit = null
         macroLabelEdit = null
@@ -489,6 +496,22 @@ class KeyEditorActivity : AppCompatActivity() {
                 )
                 layoutSwitchLabelEdit = labelEdit.second
                 fieldsContainer.addView(labelEdit.first)
+                layoutSwitchTargetSpinner = uiBuilder.createSwitchTargetSpinner(
+                    fieldsContainer,
+                    keyData["subLabel"] as? String ?: ""
+                )
+                layoutSwitchTargetSpinner?.onItemSelectedListener =
+                    object : android.widget.AdapterView.OnItemSelectedListener {
+                        override fun onItemSelected(
+                            parent: android.widget.AdapterView<*>?,
+                            view: android.view.View?,
+                            position: Int,
+                            id: Long
+                        ) {
+                            updateActionButtonState()
+                        }
+                        override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+                    }
                 if (!disableWeightEditing) {
                     val weightEdit = uiBuilder.createEditField(
                         getString(R.string.text_keyboard_layout_key_weight),
@@ -728,6 +751,62 @@ class KeyEditorActivity : AppCompatActivity() {
             }
 
             "CommaKey", "LanguageKey", "SpaceKey" -> {
+                if (!disableWeightEditing) {
+                    val weightEdit = uiBuilder.createEditField(
+                        getString(R.string.text_keyboard_layout_key_weight),
+                        (keyData["weight"] as? Number)?.toString() ?: ""
+                    )
+                    simpleWeightEdit = weightEdit.second
+                    fieldsContainer.addView(weightEdit.first)
+                }
+            }
+
+            "NumPadKey" -> {
+                val labelEdit = uiBuilder.createEditField(
+                    getString(R.string.text_keyboard_layout_key_label),
+                    keyData["label"] as? String ?: "0"
+                )
+                numPadLabelEdit = labelEdit.second
+                fieldsContainer.addView(labelEdit.first)
+                val currentSym = when (val s = keyData["sym"]) {
+                    is Number -> s.toInt()
+                    is String -> LayoutJsonUtils.resolveKeysym(s) ?: 0
+                    else -> 0
+                }
+                numPadSymSpinner = uiBuilder.createNumPadSymSpinner(fieldsContainer, currentSym)
+                // Keep the displayed label in sync with the selected numpad symbol, unless the
+                // user typed a custom label. Otherwise the preview would keep showing the old
+                // label after switching the symbol.
+                numPadSymSpinner?.onItemSelectedListener =
+                    object : android.widget.AdapterView.OnItemSelectedListener {
+                        override fun onItemSelected(
+                            parent: android.widget.AdapterView<*>?,
+                            view: android.view.View?,
+                            position: Int,
+                            id: Long
+                        ) {
+                            val option = KeyboardEditorUiBuilder.NUMPAD_OPTIONS.getOrNull(position) ?: return
+                            val current = numPadLabelEdit?.text?.toString().orEmpty()
+                            val synced = current.isEmpty() ||
+                                KeyboardEditorUiBuilder.NUMPAD_OPTIONS.any { it.label == current }
+                            if (synced) numPadLabelEdit?.setText(option.label)
+                            updateActionButtonState()
+                        }
+                        override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {
+                            updateActionButtonState()
+                        }
+                    }
+                if (!disableWeightEditing) {
+                    val weightEdit = uiBuilder.createEditField(
+                        getString(R.string.text_keyboard_layout_key_weight),
+                        (keyData["weight"] as? Number)?.toString() ?: ""
+                    )
+                    simpleWeightEdit = weightEdit.second
+                    fieldsContainer.addView(weightEdit.first)
+                }
+            }
+
+            "MiniSpaceKey" -> {
                 if (!disableWeightEditing) {
                     val weightEdit = uiBuilder.createEditField(
                         getString(R.string.text_keyboard_layout_key_weight),
@@ -1238,9 +1317,10 @@ class KeyEditorActivity : AppCompatActivity() {
             "LayoutSwitchKey" -> {
                 val label = layoutSwitchLabelEdit?.text?.toString()?.ifEmpty { "?123" }.orEmpty()
                 if (label.isNotEmpty()) draft["label"] = label
-                (keyData["subLabel"] as? String)
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { draft["subLabel"] = it }
+                val target = layoutSwitchTargetSpinner?.selectedItemPosition
+                    ?.let { KeyboardEditorUiBuilder.SWITCH_TARGET_OPTIONS.getOrNull(it)?.value }
+                    ?.orEmpty()
+                if (!target.isNullOrEmpty()) draft["subLabel"] = target
                 val swipeLabel = nonMacroSwipeLabelEdit?.text?.toString()?.trim().orEmpty()
                 if (swipeLabel.isNotEmpty()) draft["swipeLabel"] = swipeLabel
                 if (!disableWeightEditing) {
@@ -1320,6 +1400,23 @@ class KeyEditorActivity : AppCompatActivity() {
             }
 
             "CommaKey", "LanguageKey", "SpaceKey" -> {
+                if (!disableWeightEditing) {
+                    parseWeight(simpleWeightEdit?.text?.toString())?.let { draft["weight"] = it }
+                }
+            }
+
+            "NumPadKey" -> {
+                val label = numPadLabelEdit?.text?.toString()?.ifEmpty { "0" }.orEmpty()
+                if (label.isNotEmpty()) draft["label"] = label
+                numPadSymSpinner?.selectedItemPosition
+                    ?.let { KeyboardEditorUiBuilder.NUMPAD_OPTIONS.getOrNull(it)?.sym }
+                    ?.let { draft["sym"] = it }
+                if (!disableWeightEditing) {
+                    parseWeight(simpleWeightEdit?.text?.toString())?.let { draft["weight"] = it }
+                }
+            }
+
+            "MiniSpaceKey" -> {
                 if (!disableWeightEditing) {
                     parseWeight(simpleWeightEdit?.text?.toString())?.let { draft["weight"] = it }
                 }
@@ -1497,6 +1594,7 @@ class KeyEditorActivity : AppCompatActivity() {
             alphabetDisplayTextModeItems,
             alphabetDisplayTextRowBindings,
             layoutSwitchLabelEdit,
+            layoutSwitchTargetSpinner,
             layoutSwitchWeightEdit,
             symbolLabelEdit,
             symbolWeightEdit,
@@ -1589,6 +1687,7 @@ class KeyEditorActivity : AppCompatActivity() {
         alphabetDisplayTextModeItems: List<KeyboardEditorUiBuilder.DisplayTextItem>,
         alphabetDisplayTextRowBindings: List<KeyboardEditorUiBuilder.DisplayTextRowBinding>,
         layoutSwitchLabelEdit: EditText?,
+        layoutSwitchTargetSpinner: Spinner?,
         layoutSwitchWeightEdit: EditText?,
         symbolLabelEdit: EditText?,
         symbolWeightEdit: EditText?,
@@ -1679,9 +1778,10 @@ class KeyEditorActivity : AppCompatActivity() {
 
             "LayoutSwitchKey" -> {
                 newKey["label"] = layoutSwitchLabelEdit?.text?.toString()?.ifEmpty { "?123" }.orEmpty()
-                (keyData["subLabel"] as? String)
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { newKey["subLabel"] = it }
+                val target = layoutSwitchTargetSpinner?.selectedItemPosition
+                    ?.let { KeyboardEditorUiBuilder.SWITCH_TARGET_OPTIONS.getOrNull(it)?.value }
+                    ?.orEmpty()
+                if (!target.isNullOrEmpty()) newKey["subLabel"] = target
                 val swipeLabel = nonMacroSwipeLabelEdit?.text?.toString()?.trim().orEmpty()
                 if (swipeLabel.isNotEmpty()) newKey["swipeLabel"] = swipeLabel
                 if (!disableWeightEditing) {
@@ -1766,6 +1866,22 @@ class KeyEditorActivity : AppCompatActivity() {
             }
 
             "CommaKey", "LanguageKey", "SpaceKey" -> {
+                if (!disableWeightEditing) {
+                    parseWeight(simpleWeightEdit?.text?.toString())?.let { newKey["weight"] = it }
+                }
+            }
+
+            "NumPadKey" -> {
+                newKey["label"] = numPadLabelEdit?.text?.toString()?.ifEmpty { "0" }.orEmpty()
+                numPadSymSpinner?.selectedItemPosition
+                    ?.let { KeyboardEditorUiBuilder.NUMPAD_OPTIONS.getOrNull(it)?.sym }
+                    ?.let { newKey["sym"] = it }
+                if (!disableWeightEditing) {
+                    parseWeight(simpleWeightEdit?.text?.toString())?.let { newKey["weight"] = it }
+                }
+            }
+
+            "MiniSpaceKey" -> {
                 if (!disableWeightEditing) {
                     parseWeight(simpleWeightEdit?.text?.toString())?.let { newKey["weight"] = it }
                 }

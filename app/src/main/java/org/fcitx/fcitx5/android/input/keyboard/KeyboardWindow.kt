@@ -165,7 +165,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val keyActionListener = KeyActionListener { it, source ->
         when (it) {
-            is KeyAction.LayoutSwitchAction -> switchLayout(it.act)
+            is KeyAction.LayoutSwitchAction -> switchLayout(it.act, fromUserKey = true)
             is KeyAction.LayerSwitchAction -> handleLayerSwitchAction(it)
             is KeyAction.AuxBarTrigger -> {
                 val actionId = it.edgeId
@@ -232,9 +232,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         to: String,
         remember: Boolean = true,
         inheritTextHeight: Boolean = true,
-        notifyHeightChange: Boolean = true
+        notifyHeightChange: Boolean = true,
+        fromUserKey: Boolean = false
     ) {
-        var target = to.ifEmpty { lastSymbolType }
+        val requestedTarget = to.ifEmpty { lastSymbolType }
+        var target = requestedTarget
         // The built-in NumberKeyboard is short-circuited by the configured numeric layout
         // no matter how it is reached: a numeric editor via onStartInput, a manual
         // LayoutSwitchKey, the symbol picker numpad button, or a preset/macro key targeting
@@ -250,6 +252,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 }
                 TextKeyboard.setForcedLayoutKey(override)
             }
+        } else if (target == TextKeyboard.Name && fromUserKey && TextKeyboard.isNumericLayoutActive()) {
+            // An explicit key in the numeric layout targets the text keyboard (e.g. an
+            // "ABC"-style LayoutSwitchKey in the custom numeric layout). Release the
+            // override for the rest of the session so the normal text keyboard shows.
+            TextKeyboard.dismissNumericLayoutOverride()
         } else if (target == TextKeyboard.Name && manualNumericOverride) {
             manualNumericOverride = false
             TextKeyboard.clearForcedLayoutKey()
@@ -266,8 +273,12 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 if (target != TextKeyboard.Name) {
                     noConfigAuxBarFallbackActive = false
                 }
-                if (remember && target != TextKeyboard.Name) {
-                    lastSymbolType = target
+                // A request for the built-in Number keyboard may be redirected to the text
+                // keyboard by the numeric layout override. Remember the requested target so
+                // the "?123" key still returns to the same (overridden) number keyboard.
+                val rememberTarget = if (target == TextKeyboard.Name) requestedTarget else target
+                if (remember && rememberTarget != TextKeyboard.Name) {
+                    lastSymbolType = rememberTarget
                 }
                 if (target == currentKeyboardName) {
                     if (target == TextKeyboard.Name) {

@@ -199,6 +199,7 @@
     <string name="text_keyboard_layout_key_label_caps">Caps</string>
     <string name="text_keyboard_layout_key_label_lang">Lang</string>
     <string name="text_keyboard_layout_key_label_space">Space</string>
+    <string name="text_keyboard_layout_key_label_minispace">␣</string>
     <string name="text_keyboard_layout_key_label_enter">Enter</string>
     <string name="space_key_label_mode">스페이스 키 라벨 스타일</string>
     <string name="space_key_label_mode_default">기본값</string>
@@ -319,6 +320,12 @@
     <string name="text_keyboard_layout_macro_event_preview">%1$s → … (총 %2$d 단계)</string>
     <string name="text_keyboard_layout_alt_label">대체 레이블</string>
     <string name="text_keyboard_layout_swipe_label">스와이프 레이블</string>
+    <string name="text_keyboard_layout_switch_target">대상</string>
+    <string name="text_keyboard_layout_switch_target_default">기본 (?123 / 마지막 기호 레이아웃)</string>
+    <string name="text_keyboard_layout_switch_target_text">텍스트 키보드</string>
+    <string name="text_keyboard_layout_switch_target_number">숫자 키보드</string>
+    <string name="text_keyboard_layout_switch_target_symbol">기호 선택기</string>
+    <string name="text_keyboard_layout_numpad_symbol">숫자 패드 기호</string>
 
     <!-- Macro Editor -->
     <string name="macro_editor_title">%1$s 편집</string>

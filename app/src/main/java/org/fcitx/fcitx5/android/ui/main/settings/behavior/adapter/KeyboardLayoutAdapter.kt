@@ -751,6 +751,8 @@ class KeyboardLayoutAdapter(
             "SymbolKey" -> key["label"] as? String ?: "."
             "ReturnKey" -> context.getString(R.string.text_keyboard_layout_key_label_enter)
             "BackspaceKey" -> "⌫"
+            "NumPadKey" -> key["label"] as? String ?: "0"
+            "MiniSpaceKey" -> context.getString(R.string.text_keyboard_layout_key_label_minispace)
             "MacroKey" -> {
                 // 显示 label 值，如果有 labelText 且当前在 submode 中，优先显示 labelText
                 val label = key["label"] as? String ?: "M"

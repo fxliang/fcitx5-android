@@ -379,10 +379,17 @@
     <string name="text_keyboard_layout_macro_event_preview">%1$s → … (全 %2$d ステップ)</string>
     <string name="text_keyboard_layout_alt_label">代替ラベル</string>
     <string name="text_keyboard_layout_swipe_label">スワイプラベル</string>
+    <string name="text_keyboard_layout_switch_target">ターゲット</string>
+    <string name="text_keyboard_layout_switch_target_default">デフォルト（?123 / 前回の記号レイアウト）</string>
+    <string name="text_keyboard_layout_switch_target_text">テキストキーボード</string>
+    <string name="text_keyboard_layout_switch_target_number">数字キーボード</string>
+    <string name="text_keyboard_layout_switch_target_symbol">記号ピッカー</string>
+    <string name="text_keyboard_layout_numpad_symbol">テンキー記号</string>
     <string name="text_keyboard_layout_display_value_hint">表示値</string>
     <string name="text_keyboard_layout_key_label_caps">Caps</string>
     <string name="text_keyboard_layout_key_label_lang">Lang</string>
     <string name="text_keyboard_layout_key_label_space">Space</string>
+    <string name="text_keyboard_layout_key_label_minispace">␣</string>
     <string name="text_keyboard_layout_key_label_enter">Enter</string>
     <string name="space_key_label_mode">スペースキーのラベル表示</string>
     <string name="space_key_label_mode_default">デフォルト</string>

@@ -486,6 +486,7 @@
     <string name="text_keyboard_layout_key_label_caps">Caps</string>
     <string name="text_keyboard_layout_key_label_lang">Lang</string>
     <string name="text_keyboard_layout_key_label_space">Space</string>
+    <string name="text_keyboard_layout_key_label_minispace">␣</string>
     <string name="text_keyboard_layout_key_label_enter">Enter</string>
     <string name="text_keyboard_layout_alphabet_key_main_required">主字元不能為空</string>
     <string name="text_keyboard_layout_alphabet_key_alt_required">副字元不能為空</string>
@@ -601,6 +602,12 @@
     <string name="text_keyboard_layout_macro_event_preview">%1$s → … (共 %2$d 步)</string>
     <string name="text_keyboard_layout_alt_label">副標籤</string>
     <string name="text_keyboard_layout_swipe_label">劃動標籤</string>
+    <string name="text_keyboard_layout_switch_target">目標</string>
+    <string name="text_keyboard_layout_switch_target_default">預設（?123 / 上次符號佈局）</string>
+    <string name="text_keyboard_layout_switch_target_text">文字鍵盤</string>
+    <string name="text_keyboard_layout_switch_target_number">數字鍵盤</string>
+    <string name="text_keyboard_layout_switch_target_symbol">符號選擇器</string>
+    <string name="text_keyboard_layout_numpad_symbol">數字鍵盤符號</string>
 
     <!-- Macro Editor -->
     <string name="macro_editor_title">編輯 %1$s</string>

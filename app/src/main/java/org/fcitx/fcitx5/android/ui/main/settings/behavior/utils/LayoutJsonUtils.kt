@@ -8,6 +8,7 @@ import android.util.Log
 import kotlinx.serialization.json.*
 import org.fcitx.fcitx5.android.input.keyboard.*
 import org.fcitx.fcitx5.android.input.keyboard.AuxBarConfig
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 
 // Import Macro types explicitly
 import org.fcitx.fcitx5.android.input.keyboard.MacroAction
@@ -34,6 +35,8 @@ object LayoutJsonUtils {
         "label",
         "altLabel",
         "subLabel",
+        "swipeLabel",
+        "sym",
         "weight",
         "rowHeightPercent",
         "tap",
@@ -243,6 +246,7 @@ object LayoutJsonUtils {
             longPressLabel = obj["longPressLabel"]?.jsonPrimitive?.content,
             subLabel = obj["subLabel"]?.jsonPrimitive?.content,
             swipeLabel = obj["swipeLabel"]?.jsonPrimitive?.content,
+            sym = obj["sym"]?.jsonPrimitive?.content?.let { resolveKeysym(it) },
             weight = parseOptionalFloat(obj["weight"]),
             rowHeightPercent = parseOptionalFloat(obj["rowHeightPercent"]),
             textColor = parseOptionalInt(obj["textColor"]),
@@ -404,6 +408,7 @@ object LayoutJsonUtils {
     private fun normalizeKeyValue(key: String, value: Any?): Any? {
         if (key != "weight" &&
             key != "rowHeightPercent" &&
+            key != "sym" &&
             key != "textColor" &&
             key != "altTextColor" &&
             key != "backgroundColor" &&
@@ -418,6 +423,8 @@ object LayoutJsonUtils {
                     ?.let {
                         if (key == "weight" || key == "rowHeightPercent") {
                             it.toFloatOrNull()
+                        } else if (key == "sym") {
+                            resolveKeysym(it)
                         } else {
                             when {
                                 it.startsWith("#") -> it.removePrefix("#").toLongOrNull(16)?.toInt()
@@ -429,6 +436,108 @@ object LayoutJsonUtils {
             }
             else -> null
         }
+    }
+
+    /**
+     * 将按键名解析为 Fcitx keysym（大小写不敏感），兼容以下格式：
+     * - 十进制数字（如 "65458"）
+     * - 十六进制（"0xffb2" 或 "#ffb2"）
+     * - X11/Fcitx 按键名（如 "KP_2"、"KP_Add"、"plus"、"BackSpace"）
+     *
+     * 纯数字与运算符标签按数字键盘语义解析到 KP_* keysym。
+     */
+    fun resolveKeysym(input: String?): Int? {
+        if (input.isNullOrBlank()) return null
+        val trimmed = input.trim()
+        // 先查按键名表：纯数字标签（如 "2"）按数字键盘语义解析为 KP_*，
+        // 避免 "2" 被误当成十进制 keysym 2（0x02，控制符）。
+        SYM_NAME_TO_CODE[trimmed]?.let { return it }
+        SYM_NAME_TO_CODE[trimmed.lowercase()]?.let { return it }
+        trimmed.toIntOrNull()?.let { return it }
+        if (trimmed.startsWith("0x", ignoreCase = true)) {
+            trimmed.removePrefix("0x").toIntOrNull(16)?.let { return it }
+        }
+        if (trimmed.startsWith("#")) {
+            trimmed.removePrefix("#").toIntOrNull(16)?.let { return it }
+        }
+        return null
+    }
+
+    /**
+     * 将 Fcitx keysym 转换为人类可读的规范按键名（如 65458 → "KP_2"）。
+     * 未知的 keysym 原样返回整数，保证 round-trip 兼容。
+     */
+    fun keysymToName(sym: Int): Any? = SYM_CODE_TO_NAME[sym] ?: sym
+
+    private val SYM_CODE_TO_NAME: Map<Int, String> = buildMap {
+        for (i in 0..9) {
+            put(FcitxKeyMapping.FcitxKey_KP_0 + i, "KP_$i")
+        }
+        put(FcitxKeyMapping.FcitxKey_KP_Add, "KP_Add")
+        put(FcitxKeyMapping.FcitxKey_KP_Subtract, "KP_Subtract")
+        put(FcitxKeyMapping.FcitxKey_KP_Multiply, "KP_Multiply")
+        put(FcitxKeyMapping.FcitxKey_KP_Divide, "KP_Divide")
+        put(FcitxKeyMapping.FcitxKey_KP_Decimal, "KP_Decimal")
+        put(FcitxKeyMapping.FcitxKey_KP_Separator, "KP_Separator")
+        put(FcitxKeyMapping.FcitxKey_KP_Equal, "KP_Equal")
+        put(FcitxKeyMapping.FcitxKey_KP_Enter, "KP_Enter")
+    }
+
+    private val SYM_NAME_TO_CODE: Map<String, Int> = buildMap {
+        for (i in 0..9) {
+            put(i.toString(), FcitxKeyMapping.FcitxKey_KP_0 + i)
+            put("kp_$i", FcitxKeyMapping.FcitxKey_KP_0 + i)
+        }
+        for (c in 'a'..'z') {
+            put(c.toString(), FcitxKeyMapping.FcitxKey_a + (c - 'a'))
+            put(c.uppercaseChar().toString(), FcitxKeyMapping.FcitxKey_a + (c - 'a'))
+        }
+        put("+", FcitxKeyMapping.FcitxKey_KP_Add)
+        put("-", FcitxKeyMapping.FcitxKey_KP_Subtract)
+        put("*", FcitxKeyMapping.FcitxKey_KP_Multiply)
+        put("/", FcitxKeyMapping.FcitxKey_KP_Divide)
+        put(",", FcitxKeyMapping.FcitxKey_KP_Separator)
+        put(".", FcitxKeyMapping.FcitxKey_KP_Decimal)
+        put("=", FcitxKeyMapping.FcitxKey_KP_Equal)
+        put("kp_add", FcitxKeyMapping.FcitxKey_KP_Add)
+        put("kp_subtract", FcitxKeyMapping.FcitxKey_KP_Subtract)
+        put("kp_multiply", FcitxKeyMapping.FcitxKey_KP_Multiply)
+        put("kp_divide", FcitxKeyMapping.FcitxKey_KP_Divide)
+        put("kp_decimal", FcitxKeyMapping.FcitxKey_KP_Decimal)
+        put("kp_separator", FcitxKeyMapping.FcitxKey_KP_Separator)
+        put("kp_equal", FcitxKeyMapping.FcitxKey_KP_Equal)
+        put("kp_enter", FcitxKeyMapping.FcitxKey_KP_Enter)
+        // 常用 X11/Fcitx 规范键名（小写）
+        put("space", FcitxKeyMapping.FcitxKey_space)
+        put("numbersign", FcitxKeyMapping.FcitxKey_numbersign)
+        put("apostrophe", FcitxKeyMapping.FcitxKey_apostrophe)
+        put("asterisk", FcitxKeyMapping.FcitxKey_asterisk)
+        put("plus", FcitxKeyMapping.FcitxKey_plus)
+        put("comma", FcitxKeyMapping.FcitxKey_comma)
+        put("minus", FcitxKeyMapping.FcitxKey_minus)
+        put("period", FcitxKeyMapping.FcitxKey_period)
+        put("slash", FcitxKeyMapping.FcitxKey_slash)
+        put("semicolon", FcitxKeyMapping.FcitxKey_semicolon)
+        put("equal", FcitxKeyMapping.FcitxKey_equal)
+        put("at", FcitxKeyMapping.FcitxKey_at)
+        put("bracketleft", FcitxKeyMapping.FcitxKey_bracketleft)
+        put("bracketright", FcitxKeyMapping.FcitxKey_bracketright)
+        put("backslash", FcitxKeyMapping.FcitxKey_backslash)
+        put("grave", FcitxKeyMapping.FcitxKey_grave)
+        put("return", FcitxKeyMapping.FcitxKey_Return)
+        put("backspace", FcitxKeyMapping.FcitxKey_BackSpace)
+        put("tab", FcitxKeyMapping.FcitxKey_Tab)
+        put("escape", FcitxKeyMapping.FcitxKey_Escape)
+        put("up", FcitxKeyMapping.FcitxKey_Up)
+        put("down", FcitxKeyMapping.FcitxKey_Down)
+        put("left", FcitxKeyMapping.FcitxKey_Left)
+        put("right", FcitxKeyMapping.FcitxKey_Right)
+        put("home", FcitxKeyMapping.FcitxKey_Home)
+        put("end", FcitxKeyMapping.FcitxKey_End)
+        put("page_up", FcitxKeyMapping.FcitxKey_Page_Up)
+        put("page_down", FcitxKeyMapping.FcitxKey_Page_Down)
+        put("insert", FcitxKeyMapping.FcitxKey_Insert)
+        put("delete", FcitxKeyMapping.FcitxKey_Delete)
     }
 
     /**
@@ -483,6 +592,7 @@ object LayoutJsonUtils {
         val longPressLabel: String? = null,  // MacroKey 使用
         val subLabel: String? = null,  // LayoutSwitchKey 使用
         val swipeLabel: String? = null,  // 非 Macro 的 swipe 提示
+        val sym: Int? = null,  // NumPadKey 使用（Fcitx keysym）
         val weight: Float? = null,
         val textColor: Int? = null,
         val textColorMonet: String? = null,
@@ -518,6 +628,8 @@ object LayoutJsonUtils {
             is ReturnKey -> "ReturnKey"
             is BackspaceKey -> "BackspaceKey"
             is MacroKey -> "MacroKey"
+            is NumPadKey -> "NumPadKey"
+            is MiniSpaceKey -> "MiniSpaceKey"
             else -> "SpaceKey"
         }
 
@@ -575,6 +687,14 @@ object LayoutJsonUtils {
                 json["weight"] = appearance.percentWidth
                 keyDef.swipeLabel?.let { json["swipeLabel"] = it }
                 keyDef.swipe?.let { json["swipe"] = macroActionToJson(it) }
+            }
+            is NumPadKey -> {
+                json["label"] = (appearance as? KeyDef.Appearance.Text)?.displayText
+                json["sym"] = keysymToName(keyDef.sym)
+                json["weight"] = appearance.percentWidth.takeIf { it != 0.1f }
+            }
+            is MiniSpaceKey -> {
+                json["weight"] = appearance.percentWidth.takeIf { it != 0.15f }
             }
             is MacroKey -> {
                 json["label"] = keyDef.label
@@ -800,6 +920,14 @@ object LayoutJsonUtils {
                 backgroundColorMonet = key.backgroundColorMonet,
                 shadowColor = key.shadowColor,
                 shadowColorMonet = key.shadowColorMonet
+            )
+            "NumPadKey" -> NumPadKey(
+                displayText = key.label ?: "0",
+                sym = key.sym ?: resolveKeysym(key.label) ?: FcitxKeyMapping.FcitxKey_KP_0,
+                percentWidth = key.weight ?: 0.1f
+            )
+            "MiniSpaceKey" -> MiniSpaceKey(
+                percentWidth = key.weight ?: 0.15f
             )
             "MacroKey" -> {
                 val tap = key.tap ?: throw IllegalArgumentException("MacroKey requires 'tap' action")
@@ -1093,7 +1221,14 @@ object LayoutJsonUtils {
         val ordered = LinkedHashMap<String, Any?>()
         KEY_FIELD_ORDER.forEach { key ->
             if (keyMap.containsKey(key)) {
-                ordered[key] = keyMap[key]
+                ordered[key] = if (key == "sym" && keyMap["type"] == "NumPadKey") {
+                    when (val sym = keyMap[key]) {
+                        is Number -> keysymToName(sym.toInt())
+                        else -> sym
+                    }
+                } else {
+                    keyMap[key]
+                }
             }
         }
         keyMap.forEach { (key, value) ->

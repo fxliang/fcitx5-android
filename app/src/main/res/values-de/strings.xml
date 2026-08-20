@@ -282,10 +282,17 @@
     <string name="text_keyboard_layout_macro_event_preview">%1$s → … (insgesamt %2$d Schritte)</string>
     <string name="text_keyboard_layout_alt_label">Alternatives Etikett</string>
     <string name="text_keyboard_layout_swipe_label">Wisch-Label</string>
+    <string name="text_keyboard_layout_switch_target">Ziel</string>
+    <string name="text_keyboard_layout_switch_target_default">Standard (?123 / letztes Symbol-Layout)</string>
+    <string name="text_keyboard_layout_switch_target_text">Texttastatur</string>
+    <string name="text_keyboard_layout_switch_target_number">Zifferntastatur</string>
+    <string name="text_keyboard_layout_switch_target_symbol">Symbolauswahl</string>
+    <string name="text_keyboard_layout_numpad_symbol">Ziffernblock-Symbol</string>
     <string name="text_keyboard_layout_display_value_hint">Anzeigewert</string>
     <string name="text_keyboard_layout_key_label_caps">Caps</string>
     <string name="text_keyboard_layout_key_label_lang">Lang</string>
     <string name="text_keyboard_layout_key_label_space">Space</string>
+    <string name="text_keyboard_layout_key_label_minispace">␣</string>
     <string name="text_keyboard_layout_key_label_enter">Enter</string>
     <string name="text_keyboard_layout_alphabet_key_main_required">Hauptzeichen darf nicht leer sein</string>
     <string name="text_keyboard_layout_alphabet_key_alt_required">Alternatives Zeichen darf nicht leer sein</string>

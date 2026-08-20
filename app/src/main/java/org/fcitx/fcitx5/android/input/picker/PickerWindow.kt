@@ -75,7 +75,7 @@ class PickerWindow(
             is KeyAction.LayoutSwitchAction -> {
                 // Switch to NumberKeyboard before attaching KeyboardWindow
                 (windowManager.getEssentialWindow(KeyboardWindow) as KeyboardWindow)
-                    .switchLayout(it.act)
+                    .switchLayout(it.act, fromUserKey = true)
                 // The real switchLayout (detachCurrentLayout and attachLayout) in KeyboardWindow is postponed,
                 // so we have to postpone attachWindow as well
                 ContextCompat.getMainExecutor(context).execute {

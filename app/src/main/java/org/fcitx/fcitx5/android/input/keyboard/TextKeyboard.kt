@@ -193,6 +193,26 @@ class TextKeyboard(
         @Synchronized
         fun isNumericLayoutActive(): Boolean = numericLayoutKey != null
 
+        /**
+         * Release the numeric-input layout override for the rest of the current session,
+         * clearing both the session slot and the forced slot. Used when the user explicitly
+         * switches back to the text keyboard (e.g. an "ABC"-style key in the custom numeric
+         * layout). Unlike [clearForcedLayoutKey], this does not fall back to the numeric
+         * layout, so input method updates will not silently pull the editor back onto it.
+         * A new [onStartInput] call re-applies the override via [setNumericLayoutKey].
+         */
+        @Synchronized
+        fun dismissNumericLayoutOverride() {
+            if (numericLayoutKey == null && forcedLayoutKey == null) return
+            numericLayoutKey = null
+            forcedLayoutKey = null
+            forEachAttachedKeyboard { keyboard ->
+                keyboard.refreshStyle()
+                keyboard.markLayoutSignatureApplied()
+                ime?.let { keyboard.updateSpaceLabel(it) }
+            }
+        }
+
         @Synchronized
         private fun forEachAttachedKeyboard(action: (TextKeyboard) -> Unit) {
             val living = attachedKeyboards.mapNotNull { it.get() }

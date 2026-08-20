@@ -568,10 +568,12 @@ class TextPickerSwitchKey(
     )
 )
 
-class MiniSpaceKey : KeyDef(
+class MiniSpaceKey(
+    percentWidth: Float = 0.15f
+) : KeyDef(
     Appearance.Image(
         src = R.drawable.ic_baseline_space_bar_24,
-        percentWidth = 0.15f,
+        percentWidth = percentWidth,
         variant = Variant.Alternative,
         viewId = R.id.button_mini_space
     ),

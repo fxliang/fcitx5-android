@@ -442,6 +442,7 @@
     <string name="text_keyboard_layout_key_label_caps">Caps</string>
     <string name="text_keyboard_layout_key_label_lang">Lang</string>
     <string name="text_keyboard_layout_key_label_space">Space</string>
+    <string name="text_keyboard_layout_key_label_minispace">␣</string>
     <string name="text_keyboard_layout_key_label_enter">Enter</string>
     <string name="space_key_label_mode">Стиль подписи клавиши пробела</string>
     <string name="space_key_label_mode_default">По умолчанию</string>
@@ -538,6 +539,12 @@
     <string name="text_keyboard_layout_macro_event_preview">%1$s → … (всего шагов: %2$d)</string>
     <string name="text_keyboard_layout_alt_label">Альтернативная метка</string>
     <string name="text_keyboard_layout_swipe_label">Метка свайпа</string>
+    <string name="text_keyboard_layout_switch_target">Цель</string>
+    <string name="text_keyboard_layout_switch_target_default">По умолчанию (?123 / последняя раскладка символов)</string>
+    <string name="text_keyboard_layout_switch_target_text">Текстовая клавиатура</string>
+    <string name="text_keyboard_layout_switch_target_number">Цифровая клавиатура</string>
+    <string name="text_keyboard_layout_switch_target_symbol">Выбор символов</string>
+    <string name="text_keyboard_layout_numpad_symbol">Символ цифровой клавиатуры</string>
 
     <!-- Macro Editor -->
     <string name="macro_editor_title">Редактировать %1$s</string>

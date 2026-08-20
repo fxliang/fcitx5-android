@@ -606,10 +606,17 @@
     <string name="text_keyboard_layout_macro_event_preview">%1$s → … (%2$d steps total)</string>
     <string name="text_keyboard_layout_alt_label">Alt Label</string>
     <string name="text_keyboard_layout_swipe_label">Swipe Label</string>
+    <string name="text_keyboard_layout_switch_target">Target</string>
+    <string name="text_keyboard_layout_switch_target_default">Default (?123 / last symbol layout)</string>
+    <string name="text_keyboard_layout_switch_target_text">Text keyboard</string>
+    <string name="text_keyboard_layout_switch_target_number">Number keyboard</string>
+    <string name="text_keyboard_layout_switch_target_symbol">Symbol picker</string>
+    <string name="text_keyboard_layout_numpad_symbol">Numpad Symbol</string>
     <string name="text_keyboard_layout_display_value_hint">Display value</string>
     <string name="text_keyboard_layout_key_label_caps">Caps</string>
     <string name="text_keyboard_layout_key_label_lang">Lang</string>
     <string name="text_keyboard_layout_key_label_space">Space</string>
+    <string name="text_keyboard_layout_key_label_minispace">␣</string>
     <string name="text_keyboard_layout_key_label_enter">Enter</string>
     <string name="text_keyboard_layout_alphabet_key_main_required">Main character must not be empty</string>
     <string name="text_keyboard_layout_alphabet_key_alt_required">Alt character must not be empty</string>
