@@ -425,6 +425,8 @@
     <string name="text_keyboard_layout_key_color_monet_unavailable">Динамический цвет Monet недоступен</string>
     <string name="text_keyboard_layout_layout_name">Имя раскладки</string>
     <string name="text_keyboard_layout_layout_name_hint">например: rime, pinyin</string>
+    <string name="numeric_layout_override_title">Раскладка клавиатуры для чисел</string>
+    <string name="numeric_layout_override_builtin">Встроенная цифровая клавиатура</string>
     <string name="text_keyboard_layout_copy_from">Скопировать из существующей раскладки</string>
     <string name="text_keyboard_layout_name_empty">Имя раскладки не может быть пустым</string>
     <string name="text_keyboard_layout_delete_key_confirm">Удалить эту клавишу?</string>

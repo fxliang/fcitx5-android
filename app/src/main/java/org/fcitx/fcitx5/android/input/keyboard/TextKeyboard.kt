@@ -170,12 +170,28 @@ class TextKeyboard(
             // Latched layers were just cleared by the caller; the forced slot now carries
             // the numeric layout and keeps falling back to it for the rest of the session.
             forcedLayoutKey = normalized
+            var refreshedAny = false
             forEachAttachedKeyboard { keyboard ->
                 keyboard.refreshStyle()
-                keyboard.markLayoutSignatureApplied()
+                refreshedAny = true
                 ime?.let { keyboard.updateSpaceLabel(it) }
             }
+            // Mark the layout signature as applied only for keyboards that actually reloaded
+            // just now. Otherwise the next attach/onInputMethodUpdate must still see the
+            // signature mismatch and rebuild the correct forced layout.
+            if (refreshedAny) {
+                forEachAttachedKeyboard { it.markLayoutSignatureApplied() }
+            }
         }
+
+        /**
+         * Whether the current input session is a numeric editor carrying a resolvable
+         * layout override (set by [setNumericLayoutKey] from [KeyboardWindow.onStartInput]).
+         * While active, requests to show the built-in Number keyboard are redirected to the
+         * text keyboard so the override applies uniformly no matter how it is reached.
+         */
+        @Synchronized
+        fun isNumericLayoutActive(): Boolean = numericLayoutKey != null
 
         @Synchronized
         private fun forEachAttachedKeyboard(action: (TextKeyboard) -> Unit) {

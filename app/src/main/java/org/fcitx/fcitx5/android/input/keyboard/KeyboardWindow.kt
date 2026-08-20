@@ -102,6 +102,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private var oneShotLayerKey: String? = null
     private val layerHistory = ArrayDeque<String>()
     private var noConfigAuxBarFallbackActive = false
+    private var manualNumericOverride = false
     private var companionHeightPercentOverride: Int? = null
     private var companionHeightPxOverride: Int? = null
 
@@ -233,7 +234,26 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         inheritTextHeight: Boolean = true,
         notifyHeightChange: Boolean = true
     ) {
-        val target = to.ifEmpty { lastSymbolType }
+        var target = to.ifEmpty { lastSymbolType }
+        // The built-in NumberKeyboard is short-circuited by the configured numeric layout
+        // no matter how it is reached: a numeric editor via onStartInput, a manual
+        // LayoutSwitchKey, the symbol picker numpad button, or a preset/macro key targeting
+        // the Number keyboard. In a numeric editor session the override is sticky; a manual
+        // switch from a text session is remembered so switching back to Text restores the
+        // normal text keyboard.
+        if (target == NumberKeyboard.Name) {
+            val override = TextKeyboard.resolveNumericLayoutKey()
+            if (override != null) {
+                target = TextKeyboard.Name
+                if (!TextKeyboard.isNumericLayoutActive()) {
+                    manualNumericOverride = true
+                }
+                TextKeyboard.setForcedLayoutKey(override)
+            }
+        } else if (target == TextKeyboard.Name && manualNumericOverride) {
+            manualNumericOverride = false
+            TextKeyboard.clearForcedLayoutKey()
+        }
         ContextCompat.getMainExecutor(service).execute {
             if (target == TextKeyboard.Name || target == NumberKeyboard.Name) {
                 if (target == TextKeyboard.Name) {
@@ -401,6 +421,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         oneShotLayerKey = null
         layerHistory.clear()
         noConfigAuxBarFallbackActive = false
+        manualNumericOverride = false
         preeditEmpty = true
         candidateEmpty = true
         composingState = false
