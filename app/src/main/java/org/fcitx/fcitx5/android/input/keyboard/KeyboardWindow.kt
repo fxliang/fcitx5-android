@@ -262,11 +262,21 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 target = TextKeyboard.Name
                 TextKeyboard.activateManualNumericLayout(override)
             }
-        } else if (target == TextKeyboard.Name && fromUserKey && TextKeyboard.isNumericLayoutActive()) {
-            // An explicit key in the numeric layout targets the text keyboard (e.g. an
-            // "ABC"-style LayoutSwitchKey in the custom numeric layout). Release the
-            // override for the rest of the session so the normal text keyboard shows.
-            TextKeyboard.dismissNumericLayoutOverride()
+        } else if (target == TextKeyboard.Name && fromUserKey) {
+            // An explicit user key targeting the text keyboard (e.g. an "ABC"-style
+            // LayoutSwitchKey) resets latched/one-shot layers so the normal text keyboard
+            // shows again even when a MacroKey layer switch is currently latched, and
+            // releases any numeric override for the rest of the session.
+            latchedLayerKey = null
+            oneShotLayerKey = null
+            layerHistory.clear()
+            noConfigAuxBarFallbackActive = false
+            applyEffectiveTextLayer()
+            if (TextKeyboard.isNumericLayoutActive()) {
+                TextKeyboard.dismissNumericLayoutOverride()
+            } else {
+                TextKeyboard.releaseManualNumericLayout()
+            }
         } else if (target == TextKeyboard.Name) {
             TextKeyboard.releaseManualNumericLayout()
         }
