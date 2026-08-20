@@ -75,11 +75,19 @@ class TextKeyboard(
             cachedRawLayoutJson = null
             lastRawModified = 0L
             lastRawLayoutFile = null
+            // The layout profile may have changed mid-session. A numeric override resolved
+            // at the last onStartInput can reference a layout that no longer exists (or now
+            // means something else); re-validate it so numeric editors do not silently keep
+            // rendering the wrong layout.
+            val droppedOverride = revalidateNumericLayoutOverride()
             val living = attachedKeyboards.mapNotNull { it.get() }
             attachedKeyboards.removeAll { it.get() == null }
             living.forEach { keyboard ->
                 keyboard.refreshStyle()
                 ime?.let { keyboard.updateSpaceLabel(it) }
+            }
+            if (droppedOverride) {
+                numericLayoutFallbackTarget?.get()?.fallbackToNumberKeyboard()
             }
         }
 
@@ -123,6 +131,7 @@ class TextKeyboard(
         private var lastLayoutCacheInvalidated = 0L
         private var forcedLayoutKey: String? = null
         private var numericLayoutKey: String? = null
+        private var numericLayoutFallbackTarget: WeakReference<KeyboardWindow>? = null
         var resolvedAuxBarConfig: AuxBarConfig? = null
         var resolvedAuxBarKeys: List<Map<String, Any?>> = emptyList()
 
@@ -234,6 +243,33 @@ class TextKeyboard(
             val option = AppPrefs.getInstance().keyboard.numericLayoutOverride.getValue()
                 .trim().takeIf { it.isNotEmpty() } ?: return null
             return option.takeIf { containsLayoutKey(json, it) }
+        }
+
+        /**
+         * Re-resolve the numeric-input layout override against the current layout profile.
+         * A layout file/profile change can invalidate the session override set at the last
+         * [onStartInput]: the referenced layout key may have been removed or renamed, or it
+         * may now map to a different layout. Returns true when a previously active override
+         * no longer resolves and has been dropped.
+         */
+        @Synchronized
+        fun revalidateNumericLayoutOverride(): Boolean {
+            val current = numericLayoutKey ?: return false
+            val resolved = resolveNumericLayoutKey()
+            if (resolved == current) return false
+            val dropped = resolved == null
+            numericLayoutKey = resolved
+            // Only update the forced slot when it still carries the numeric override; a
+            // latched/one-shot layer may have superseded it for the rest of the session.
+            if (forcedLayoutKey == current) {
+                forcedLayoutKey = resolved
+            }
+            return dropped
+        }
+
+        @Synchronized
+        fun setNumericLayoutFallbackTarget(window: KeyboardWindow?) {
+            numericLayoutFallbackTarget = window?.let(::WeakReference)
         }
 
         @Synchronized

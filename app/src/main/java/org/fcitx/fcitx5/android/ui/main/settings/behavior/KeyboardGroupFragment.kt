@@ -165,7 +165,12 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
 
     private fun buildNumericLayoutOverrideSummary(): String {
         val value = AppPrefs.getInstance().keyboard.numericLayoutOverride.getValue().trim()
-        return if (value.isEmpty()) getString(R.string.numeric_layout_override_builtin) else value
+        if (value.isEmpty()) return getString(R.string.numeric_layout_override_builtin)
+        val available = value in collectLayoutLayerEntries()
+        return if (available) value else getString(
+            R.string.numeric_layout_override_unavailable,
+            value
+        )
     }
 
     /**
@@ -218,6 +223,7 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
                 AppPrefs.getInstance().keyboard.textKeyboardLayoutProfile.setValue(sel)
                 ConfigProviders.provider = ConfigProviders.provider
                 textLayoutFileSelectPreference?.summary = buildCurrentTextLayoutFileSummary()
+                numericLayoutOverridePreference?.summary = buildNumericLayoutOverrideSummary()
                 dialog.dismiss()
             }
             .setNegativeButton(android.R.string.cancel, null)

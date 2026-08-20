@@ -184,6 +184,7 @@
     <string name="text_keyboard_layout_layout_name_hint">예: rime, pinyin</string>
     <string name="numeric_layout_override_title">숫자 입력 키보드 레이아웃</string>
     <string name="numeric_layout_override_builtin">기본 숫자 키보드</string>
+    <string name="numeric_layout_override_unavailable">%1$s (현재 프로필에서 사용할 수 없음)</string>
     <string name="text_keyboard_layout_copy_from">기존 레이아웃에서 복사</string>
     <string name="text_keyboard_layout_name_empty">레이아웃 이름은 비워둘 수 없습니다</string>
     <string name="text_keyboard_layout_delete_key_confirm">이 키를 삭제하시겠습니까?</string>

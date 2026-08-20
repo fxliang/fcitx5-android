@@ -261,6 +261,7 @@
     <string name="text_keyboard_layout_layout_name_hint">z. B.: rime, pinyin</string>
     <string name="numeric_layout_override_title">Tastaturlayout für Zahlenfelder</string>
     <string name="numeric_layout_override_builtin">Integrierter Ziffernblock</string>
+    <string name="numeric_layout_override_unavailable">%1$s (im aktuellen Profil nicht verfügbar)</string>
     <string name="text_keyboard_layout_copy_from">Aus bestehendem Layout kopieren</string>
     <string name="text_keyboard_layout_name_empty">Layoutname darf nicht leer sein</string>
     <string name="text_keyboard_layout_delete_key_confirm">Diese Taste löschen?</string>

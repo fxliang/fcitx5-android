@@ -469,6 +469,7 @@
     <string name="text_keyboard_layout_layout_name_hint">例如：rime、pinyin</string>
     <string name="numeric_layout_override_title">數字鍵盤佈局</string>
     <string name="numeric_layout_override_builtin">內建數字鍵盤</string>
+    <string name="numeric_layout_override_unavailable">%1$s（目前設定中不可用）</string>
     <string name="text_keyboard_layout_layout_name_exists">佈局名稱已存在</string>
     <string name="text_keyboard_layout_copy_from">從現有佈局複製</string>
     <string name="text_keyboard_layout_name_empty">佈局名稱不能為空</string>

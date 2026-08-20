@@ -57,6 +57,16 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         refreshCurrentKeyboard()
     }
 
+    init {
+        TextKeyboard.setNumericLayoutFallbackTarget(this)
+    }
+
+    internal fun fallbackToNumberKeyboard() {
+        if (currentKeyboardName == TextKeyboard.Name) {
+            switchLayout(NumberKeyboard.Name, remember = false, inheritTextHeight = false)
+        }
+    }
+
     companion object : EssentialWindow.Key {
         private const val MAX_LAYER_HISTORY = 8
     }
@@ -135,7 +145,14 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
      * Call this when split keyboard settings (gap, threshold, enabled) change.
      */
     fun refreshAllKeyboards() {
+        // A layout profile switch can invalidate the numeric-input override resolved at the
+        // last onStartInput. Drop it first so the refresh below does not render the stale
+        // (or now-different) layout, and fall back to the built-in number keyboard.
+        val droppedOverride = TextKeyboard.revalidateNumericLayoutOverride()
         keyboards.values.forEach { it.refreshStyle() }
+        if (droppedOverride && currentKeyboardName == TextKeyboard.Name) {
+            switchLayout(NumberKeyboard.Name, remember = false, inheritTextHeight = false)
+        }
         reapplyReturnKeyDrawable()
     }
 
