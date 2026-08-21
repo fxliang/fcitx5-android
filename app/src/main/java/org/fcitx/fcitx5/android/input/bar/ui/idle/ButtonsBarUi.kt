@@ -175,6 +175,10 @@ class ButtonsBarUi(
 
     fun getButton(buttonId: String): ToolButton? = buttonMap[buttonId]
 
+    fun clearTransientPressState() {
+        buttonMap.values.forEach { it.clearTransientPressState() }
+    }
+
     fun setFloatingState(isFloating: Boolean) {
         buttonActiveMap["floating_toggle"] = isFloating
         buttonMap["floating_toggle"]?.setActive(isFloating)

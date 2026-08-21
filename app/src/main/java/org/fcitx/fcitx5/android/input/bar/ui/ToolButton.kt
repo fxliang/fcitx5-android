@@ -80,6 +80,14 @@ class ToolButton(context: Context) : CustomGestureView(context) {
 
     fun iconAnimate(): ViewPropertyAnimator = image.animate()
 
+    /**
+     * End a touch ripple before this button's containing UI is replaced.
+     */
+    fun clearTransientPressState() {
+        cancelGestures()
+        jumpDrawablesToCurrentState()
+    }
+
     fun setIcon(@DrawableRes icon: Int) {
         usingCustomDrawable = false
         textView.visibility = View.GONE

@@ -715,6 +715,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private fun switchUiByState(state: KawaiiBarStateMachine.State) {
         val index = state.ordinal
         if (view.displayedChild == index) return
+        if (
+            view.displayedChild == KawaiiBarStateMachine.State.Idle.ordinal &&
+            state == KawaiiBarStateMachine.State.Title
+        ) {
+            // An extended window replaces IdleUi immediately. End its unbounded button
+            // ripples before the title bar is drawn in the same region.
+            idleUi.clearTransientPressState()
+        }
         val new = view.getChildAt(index)
         if (new != titleUi.root) {
             titleUi.setReturnButtonOnClickListener { }

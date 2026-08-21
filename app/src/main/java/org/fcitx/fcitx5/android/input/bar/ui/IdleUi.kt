@@ -206,6 +206,12 @@ class IdleUi(
         add(numberRow, lParams(matchParent, matchParent))
     }
 
+    fun clearTransientPressState() {
+        menuButton.clearTransientPressState()
+        hideKeyboardButton.clearTransientPressState()
+        buttonsUi.clearTransientPressState()
+    }
+
     fun privateMode(activate: Boolean = true) {
         if (activate == inPrivate) return
         inPrivate = activate
