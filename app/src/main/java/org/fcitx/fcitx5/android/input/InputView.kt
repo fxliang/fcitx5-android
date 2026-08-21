@@ -3340,6 +3340,10 @@ class InputView(
         broadcaster.onSelectionUpdate(start, end)
     }
 
+    internal fun clearKawaiiBarFocusState() {
+        kawaiiBar.clearFocusState()
+    }
+
     /**
      * Control whether the preedit component should display preedit text.
      * Set to false when preedit is displayed elsewhere (e.g., in floating CandidatesView).

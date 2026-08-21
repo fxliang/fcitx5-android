@@ -1349,6 +1349,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         Timber.v("sendSimulatedKeyEvent: keyCode=%d scanCode=%d action=%d unicodeChar=%d",
             keyCode, scanCode, action, event.unicodeChar)
         forwardKeyEvent(event, preserveModifierState = true)
+        if (fromMacro) {
+            inputView?.clearKawaiiBarFocusState()
+            inputView?.post { inputView?.clearKawaiiBarFocusState() }
+        }
 
         if (action == KeyEvent.ACTION_UP) {
             when (keyCode) {
