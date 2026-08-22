@@ -455,7 +455,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         noConfigAuxBarFallbackActive = false
         preeditEmpty = true
         candidateEmpty = true
-        composingState = false
+        // Let updateCompositionState notify the active keyboard as well. Resetting
+        // composingState directly can leave compose-aware keys in their old view.
         val inputClass = info.inputType and InputType.TYPE_MASK_CLASS
         val isNumericClass = inputClass == InputType.TYPE_CLASS_NUMBER ||
             inputClass == InputType.TYPE_CLASS_PHONE
