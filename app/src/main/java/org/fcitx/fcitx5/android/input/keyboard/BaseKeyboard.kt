@@ -282,7 +282,7 @@ abstract class BaseKeyboard(
 
         validatedRows.forEach { row ->
             row.forEach { (def, keyView) ->
-                if (def is SpaceKey && !spaceKeys.contains(keyView)) {
+                if ((def is SpaceKey || def is MiniSpaceKey) && !spaceKeys.contains(keyView)) {
                     spaceKeys.add(keyView)
                 }
                 if (def.composeOverride != null) {
@@ -1115,7 +1115,7 @@ abstract class BaseKeyboard(
                 is ReturnKey -> InputFeedbacks.SoundEffect.Return
                 else -> InputFeedbacks.SoundEffect.Standard
             }
-            if (def is SpaceKey) {
+            if (def is SpaceKey || def is MiniSpaceKey) {
                 spaceKeys.add(this)
                 swipeEnabled = spaceSwipeMoveCursor.getValue()
                 swipeRepeatEnabled = true

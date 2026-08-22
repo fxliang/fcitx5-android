@@ -924,10 +924,22 @@ object LayoutJsonUtils {
             "NumPadKey" -> NumPadKey(
                 displayText = key.label ?: "0",
                 sym = key.sym ?: resolveKeysym(key.label) ?: FcitxKeyMapping.FcitxKey_KP_0,
-                percentWidth = key.weight ?: 0.1f
+                percentWidth = key.weight ?: 0.1f,
+                textColor = key.textColor,
+                textColorMonet = key.textColorMonet,
+                backgroundColor = key.backgroundColor,
+                backgroundColorMonet = key.backgroundColorMonet,
+                shadowColor = key.shadowColor,
+                shadowColorMonet = key.shadowColorMonet
             )
             "MiniSpaceKey" -> MiniSpaceKey(
-                percentWidth = key.weight ?: 0.15f
+                percentWidth = key.weight ?: 0.15f,
+                textColor = key.textColor,
+                textColorMonet = key.textColorMonet,
+                backgroundColor = key.backgroundColor,
+                backgroundColorMonet = key.backgroundColorMonet,
+                shadowColor = key.shadowColor,
+                shadowColorMonet = key.shadowColorMonet
             )
             "MacroKey" -> {
                 val tap = key.tap ?: throw IllegalArgumentException("MacroKey requires 'tap' action")
