@@ -15,7 +15,33 @@ value class KeySym(val sym: Int) {
     override fun toString() = "0x" + sym.toString(16).padStart(4, '0')
 
     companion object {
+        private fun numpadKeySym(keyCode: Int): Int? = when (keyCode) {
+            KeyEvent.KEYCODE_NUMPAD_0 -> FcitxKeyMapping.FcitxKey_KP_0
+            KeyEvent.KEYCODE_NUMPAD_1 -> FcitxKeyMapping.FcitxKey_KP_1
+            KeyEvent.KEYCODE_NUMPAD_2 -> FcitxKeyMapping.FcitxKey_KP_2
+            KeyEvent.KEYCODE_NUMPAD_3 -> FcitxKeyMapping.FcitxKey_KP_3
+            KeyEvent.KEYCODE_NUMPAD_4 -> FcitxKeyMapping.FcitxKey_KP_4
+            KeyEvent.KEYCODE_NUMPAD_5 -> FcitxKeyMapping.FcitxKey_KP_5
+            KeyEvent.KEYCODE_NUMPAD_6 -> FcitxKeyMapping.FcitxKey_KP_6
+            KeyEvent.KEYCODE_NUMPAD_7 -> FcitxKeyMapping.FcitxKey_KP_7
+            KeyEvent.KEYCODE_NUMPAD_8 -> FcitxKeyMapping.FcitxKey_KP_8
+            KeyEvent.KEYCODE_NUMPAD_9 -> FcitxKeyMapping.FcitxKey_KP_9
+            KeyEvent.KEYCODE_NUMPAD_ENTER -> FcitxKeyMapping.FcitxKey_KP_Enter
+            KeyEvent.KEYCODE_NUMPAD_ADD -> FcitxKeyMapping.FcitxKey_KP_Add
+            KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> FcitxKeyMapping.FcitxKey_KP_Subtract
+            KeyEvent.KEYCODE_NUMPAD_MULTIPLY -> FcitxKeyMapping.FcitxKey_KP_Multiply
+            KeyEvent.KEYCODE_NUMPAD_DIVIDE -> FcitxKeyMapping.FcitxKey_KP_Divide
+            KeyEvent.KEYCODE_NUMPAD_DOT -> FcitxKeyMapping.FcitxKey_KP_Decimal
+            KeyEvent.KEYCODE_NUMPAD_COMMA -> FcitxKeyMapping.FcitxKey_KP_Separator
+            KeyEvent.KEYCODE_NUMPAD_EQUALS -> FcitxKeyMapping.FcitxKey_KP_Equal
+            else -> null
+        }
+
         fun fromKeyEvent(event: KeyEvent): KeySym? {
+            // Preserve keypad semantics even when Android also exposes a Unicode character
+            // such as '0' or '.'. Otherwise physical keypad keys become ordinary Rime keys.
+            numpadKeySym(event.keyCode)?.let { return KeySym(it) }
+
             val charCode = event.unicodeChar
             // try charCode first, allow upper and lower case characters generating different KeySym
             if (charCode != 0 &&
