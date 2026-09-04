@@ -105,24 +105,16 @@ class KeyboardPreviewManager(
         ConfigProviders.provider = tempProvider
         TextKeyboard.clearCachedKeyDefLayouts()
 
-        // Save the original IME state to restore later.
-        // Keep this purely in-process to avoid blocking Binder calls on UI thread.
-        val originalIme = TextKeyboard.ime
-        var appliedPreviewIme: org.fcitx.fcitx5.android.core.InputMethodEntry? = null
-
         try {
-            appliedPreviewIme = createKeyboardPreview(layoutName, previewSubModeLabel, effectiveSubModeKey, fcitxConnection)
+            createKeyboardPreview(layoutName, previewSubModeLabel, effectiveSubModeKey, fcitxConnection)
         } catch (e: Exception) {
             android.util.Log.e("KeyboardPreview", "Failed to create keyboard preview for layout: $layoutName, submode: $previewSubModeLabel", e)
             showError(e.message ?: "Unknown error")
         } finally {
-            // Restore original provider and IME state
+            // Restore the real layout provider after the preview has been built. The preview
+            // keyboard owns its layout state, so there is no shared IME left to restore.
             ConfigProviders.provider = provider
             TextKeyboard.clearCachedKeyDefLayouts()
-            // Avoid clobbering real IME updates that may happen while preview is rendering.
-            if (appliedPreviewIme != null && TextKeyboard.ime === appliedPreviewIme) {
-                TextKeyboard.ime = originalIme
-            }
         }
     }
 
@@ -224,10 +216,21 @@ class KeyboardPreviewManager(
         previewSubModeLabel: String?,
         effectiveSubModeKey: String?,
         fcitxConnection: FcitxConnection
-    ): org.fcitx.fcitx5.android.core.InputMethodEntry {
+    ) {
         val theme = ThemeManager.activeTheme
 
-        previewKeyboard = TextKeyboard(context, theme).apply {
+        // Create the preview IME from the currently cached in-process IME state, and hand it to
+        // the keyboard at construction time so its very first layout pass already resolves the
+        // previewed layout. Avoid runImmediately() here because updatePreview is called very
+        // frequently during editing and can ANR when host IME and editor contend for the same
+        // IPC path.
+        val previewIme = PreviewInputMethodEntry.create(
+            layoutName = layoutName,
+            subModeLabel = previewSubModeLabel,
+            base = TextKeyboard.ime
+        )
+
+        previewKeyboard = TextKeyboard(context, theme, previewIme, isPreview = true).apply {
             val displayMetrics = context.resources.displayMetrics
             val screenHeight = displayMetrics.heightPixels
 
@@ -270,16 +273,6 @@ class KeyboardPreviewManager(
 
             onAttach()
 
-            // Create preview IME from the currently cached in-process IME state.
-            // Avoid runImmediately() here because updatePreview is called very frequently
-            // during editing and can ANR when host IME and editor contend for the same IPC path.
-            val currentIme = TextKeyboard.ime
-            val previewIme = PreviewInputMethodEntry.create(
-                layoutName = layoutName,
-                subModeLabel = previewSubModeLabel,
-                base = currentIme
-            )
-
             onInputMethodUpdate(previewIme)
             setTextScale(1.0f)
             refreshStyle()
@@ -289,8 +282,6 @@ class KeyboardPreviewManager(
             post { previewBlurMask.refreshMask(hierarchyChanged = true) }
             requestLayout()
             invalidate()
-
-            return previewIme
         }
     }
 

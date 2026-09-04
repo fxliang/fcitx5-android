@@ -75,6 +75,7 @@ class FontsetEditorActivity : AppCompatActivity() {
             FontEntry("key_main_font", R.string.fontset_entry_key_main, getString(R.string.fontset_sample_main), 23f),
             FontEntry("key_alt_font", R.string.fontset_entry_key_alt, getString(R.string.fontset_sample_alt), 10.67f),
             FontEntry("cand_font", R.string.fontset_entry_candidate, getString(R.string.fontset_sample_candidate), 20f),
+            FontEntry(FontProviders.KEY_COMMENT_FONT, R.string.fontset_entry_comment, getString(R.string.fontset_sample_comment), FontProviders.DEFAULT_COMMENT_FONT_SIZE),
             FontEntry("popup_key_font", R.string.fontset_entry_popup_key, getString(R.string.fontset_sample_popup), 18f),
             FontEntry("preedit_font", R.string.fontset_entry_preedit, getString(R.string.fontset_sample_preedit), 18f)
         )

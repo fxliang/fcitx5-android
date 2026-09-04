@@ -33,7 +33,9 @@ import splitties.views.dsl.core.verticalLayout
 import splitties.views.setPaddingDp
 
 class QuickPhraseEditFragment : ProgressFragment(), OnItemChangedListener<QuickPhraseEntry> {
-    private val args by lazyRoute<SettingsRoute.QuickPhraseEdit>()
+    private val args by lazyRoute<SettingsRoute.QuickPhraseEdit>(
+        SettingsRoute.QuickPhraseEdit.Param.TypeMap
+    )
 
     private val quickPhrase: QuickPhrase by lazy {
         args.param.quickPhrase

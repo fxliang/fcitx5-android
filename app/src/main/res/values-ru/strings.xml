@@ -319,6 +319,8 @@
     <string name="font_size_editor_hint">Перетащите для изменения размера шрифта (%1$d–%2$d sp)</string>
     <string name="candidates_padding">Отступ от слова-кандидата</string>
     <string name="candidate_highlight_radius">Радиус скругления выделения кандидата</string>
+    <string name="highlight_first_candidate">Подсвечивать первый кандидат по умолчанию</string>
+    <string name="highlight_first_candidate_summary">Показывать фон выделения на первом кандидате, пока выбор не перемещён</string>
     <string name="candidates_window_min_width">Минимальная ширина окна кандидата</string>
     <string name="candidates_window_padding">Поле окна кандидата</string>
     <string name="restart_fcitx_instance">Перезапустить экземпляр fcitx</string>
@@ -609,6 +611,7 @@
     <string name="fontset_sample_candidate">Пример кандидата</string>
     <string name="fontset_sample_popup">Всплывающая клавиша</string>
     <string name="fontset_sample_preedit">Текст предредактирования</string>
+    <string name="fontset_sample_comment">Пример комментария</string>
     <string name="picker_category_fullwidth">Полноширинный</string>
     <string name="macro_editor_key_event_unmatched">Несоответствие событий клавиш: количество нажатий и отпусканий для %1$s не совпадает</string>
     <string name="text_keyboard_layout_qr_export">Поделиться через QR-изображение</string>
@@ -670,6 +673,7 @@
     <string name="fontset_entry_key_main">Основной шрифт клавиш</string>
     <string name="fontset_entry_popup_key">Шрифт всплывающей клавиши</string>
     <string name="fontset_entry_preedit">Шрифт предредактирования</string>
+    <string name="fontset_entry_comment">Шрифт комментариев</string>
     <string name="fontset_saved_at">Сохранено</string>
     <string name="no_fonts_found">Файлы шрифтов не найдены в fonts/</string>
     <string name="popup_preset_saved_at">Сохранено</string>

@@ -381,6 +381,8 @@
     <string name="font_size_editor_hint">拖動調整字體大小 (%1$d–%2$d sp)</string>
     <string name="candidates_padding">候選詞邊距</string>
     <string name="candidate_highlight_radius">候選項高亮圓角半徑</string>
+    <string name="highlight_first_candidate">預設高亮第一個候選</string>
+    <string name="highlight_first_candidate_summary">未移動選擇時，為預設選中的第一個候選顯示高亮底色</string>
     <string name="candidates_window_min_width">候選窗口最小寬度</string>
     <string name="candidates_window_padding">候選窗口邊距</string>
     <string name="restart_fcitx_instance">重新啟動 Fcitx 實例</string>
@@ -547,6 +549,7 @@
     <string name="fontset_entry_candidate">候選詞字體</string>
     <string name="fontset_entry_popup_key">彈出按鍵字體</string>
     <string name="fontset_entry_preedit">預編輯字體</string>
+    <string name="fontset_entry_comment">註釋字體</string>
     <string name="key_border_stroke">按鍵邊框描邊</string>
     <string name="special_key_oval_shape">使用 Gboard 風格的操作按鍵</string>
     <string name="text_keyboard_layout_file_select_title">切換鍵盤定義配置</string>
@@ -672,6 +675,7 @@
     <string name="fontset_sample_candidate">候選詞範例</string>
     <string name="fontset_sample_popup">彈出鍵</string>
     <string name="fontset_sample_preedit">預編輯文字</string>
+    <string name="fontset_sample_comment">註釋範例</string>
     <string name="picker_category_fullwidth">全形</string>
     <string name="macro_editor_key_event_unmatched">按鍵事件不匹配：%1$s 的按下和釋放次數不等</string>
     <string name="text_keyboard_layout_qr_export">透過二維碼圖片分享</string>

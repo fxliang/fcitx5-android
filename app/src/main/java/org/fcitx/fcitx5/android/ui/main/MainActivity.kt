@@ -178,8 +178,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        // Persist non-Rime state without triggering Rime user-data synchronization.
         viewModel.fcitx.runIfReady {
-            save()
+            saveNonRimeState()
         }
         super.onStop()
     }

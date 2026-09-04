@@ -73,6 +73,7 @@ class MonetThemeEditorActivity : AppCompatActivity() {
     private var waterRippleResource: SystemColorResourceId? = null
     private var waterRippleColorPreview: View? = null
     private var waterRippleColorText: TextView? = null
+    private var resetToDefaultOnSave = false
     
     // 颜色编辑项列表
     private val colorEditItems = listOf<ColorEditItem>(
@@ -382,6 +383,7 @@ class MonetThemeEditorActivity : AppCompatActivity() {
                     listener = object : SystemColorResourcePickerDialog.OnColorResourceSelectedListener {
                         override fun onColorResourceSelected(resourceId: SystemColorResourceId?) {
                             waterRippleResource = resourceId
+                            resetToDefaultOnSave = false
                             currentTheme = buildThemeFromMapping()
                             applyThemePreview(currentTheme)
                             updateWaterRippleEditorUi(resourceId)
@@ -403,6 +405,7 @@ class MonetThemeEditorActivity : AppCompatActivity() {
                     resourceId ?: return
                 // 更新映射
                     mapping = item.setter(mapping, resourceId)
+                    resetToDefaultOnSave = false
                 
                 // 更新主题预览
                     currentTheme = buildThemeFromMapping()
@@ -415,6 +418,18 @@ class MonetThemeEditorActivity : AppCompatActivity() {
         )
     }
     
+    private fun resetToDefaultColors() {
+        mapping = MonetThemeMapping.createDefault(isDark)
+        waterRippleResource = null
+        resetToDefaultOnSave = true
+        currentTheme = buildThemeFromMapping()
+        colorEditItems.forEach { item ->
+            updateColorEditorUi(item, item.getter(mapping))
+        }
+        updateWaterRippleEditorUi(null)
+        applyThemePreview(currentTheme)
+    }
+
     private fun updateColorEditorUi(item: ColorEditItem, resourceId: SystemColorResourceId) {
         val holder = colorEditorViews[item.name] ?: return
         val color = getColorForResource(resourceId)
@@ -481,8 +496,13 @@ class MonetThemeEditorActivity : AppCompatActivity() {
     
     private fun saveAndFinish() {
         // 保存映射配置
-        MonetThemePrefs.saveMapping(themeName, mapping)
-        MonetThemePrefs.saveWaterRippleResource(themeName, waterRippleResource)
+        if (resetToDefaultOnSave) {
+            MonetThemePrefs.deleteMapping(themeName)
+            MonetThemePrefs.saveWaterRippleResource(themeName, null)
+        } else {
+            MonetThemePrefs.saveMapping(themeName, mapping)
+            MonetThemePrefs.saveWaterRippleResource(themeName, waterRippleResource)
+        }
         
         // 返回结果
         val result = EditorResult(themeName, isDark)
@@ -499,6 +519,16 @@ class MonetThemeEditorActivity : AppCompatActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menu.add(
+            Menu.NONE,
+            MENU_RESET,
+            Menu.NONE,
+            getString(R.string.reset_theme_colors)
+        ).apply {
+            setIcon(R.drawable.ic_baseline_settings_backup_restore_24)
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+            icon?.setTint(styledColor(android.R.attr.textColorPrimary))
+        }
         menu.add(
             Menu.NONE,
             MENU_SAVE,
@@ -522,6 +552,10 @@ class MonetThemeEditorActivity : AppCompatActivity() {
             finish()
             true
         }
+        MENU_RESET -> {
+            resetToDefaultColors()
+            true
+        }
         MENU_SAVE -> {
             saveAndFinish()
             true
@@ -538,7 +572,8 @@ class MonetThemeEditorActivity : AppCompatActivity() {
     private fun dp(value: Float): Int = resources.displayMetrics.density.times(value).toInt()
     
     companion object {
-        private const val MENU_SAVE = 1
+        private const val MENU_RESET = 1
+        private const val MENU_SAVE = 2
         private const val EXTRA_THEME_NAME = "monet_editor_theme_name"
         private const val EXTRA_IS_DARK = "monet_editor_is_dark"
         private const val EXTRA_RESULT = "monet_editor_result"

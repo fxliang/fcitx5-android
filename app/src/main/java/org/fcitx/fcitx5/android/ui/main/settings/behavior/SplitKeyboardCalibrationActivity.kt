@@ -458,7 +458,7 @@ class SplitKeyboardCalibrationActivity : AppCompatActivity() {
             }
             val sidePaddingPx = (sidePaddingDp * displayMetrics.density).toInt()
 
-            previewKeyboard = TextKeyboard(this, theme).apply {
+            previewKeyboard = TextKeyboard(this, theme, previewIme, isPreview = true).apply {
                 val layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     keyboardHeight

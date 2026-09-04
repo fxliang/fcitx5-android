@@ -24,12 +24,16 @@ import splitties.views.setPaddingDp
 open class HorizontalCandidateViewAdapter(val theme: Theme) :
     RecyclerView.Adapter<CandidateViewHolder>() {
 
-    // Cache candidate font and refresh only when font configuration changes.
+    // Cache candidate/comment fonts and refresh only when font configuration changes.
     private var candFont: Typeface? = FontProviders.resolveTypeface("cand_font", null)
+    private var commentFont: Typeface? = resolveCommentFont()
+
+    private fun resolveCommentFont(): Typeface? = FontProviders.resolveCommentTypeface(null)
 
     private fun refreshCandidateFontIfNeeded(): Boolean {
         if (FontProviders.needsRefresh()) {
             candFont = FontProviders.resolveTypeface("cand_font", null)
+            commentFont = resolveCommentFont()
             return true
         }
         return false
@@ -93,7 +97,7 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
 
     @CallSuper
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
-        val ui = CandidateItemUi(parent.context, theme, candFont)
+        val ui = CandidateItemUi(parent.context, theme, candFont, commentFont)
         ui.root.apply {
             minimumWidth = dp(40)
             setPaddingDp(10, 0, 10, 0)
@@ -106,6 +110,7 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
     override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
         refreshCandidateFontIfNeeded()
         holder.ui.applyConfiguredTypeface(candFont)
+        holder.ui.applyConfiguredCommentTypeface(commentFont)
         holder.ui.setActive(position == activeIndex)
         holder.update(position + indexOffset, candidates[position])
     }

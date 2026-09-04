@@ -220,6 +220,26 @@ object ThemeManager {
         prefs.normalModeTheme.setValue(theme)
     }
 
+    fun isUsingConfiguredDarkTheme(): Boolean =
+        activeTheme.name == prefs.darkModeTheme.getValue().name
+
+    /**
+     * Switch to the opposite configured day/night theme and disable system following so the
+     * selection is immediately visible and remains active after the IME is recreated.
+     */
+    fun toggleConfiguredDayNightTheme(): Theme {
+        val nextTheme = if (isUsingConfiguredDarkTheme()) {
+            prefs.lightModeTheme.getValue()
+        } else {
+            prefs.darkModeTheme.getValue()
+        }
+        if (prefs.followSystemDayNightTheme.getValue()) {
+            prefs.followSystemDayNightTheme.setValue(false)
+        }
+        setNormalModeTheme(nextTheme)
+        return nextTheme
+    }
+
     private fun evaluateActiveTheme(): Theme {
         return if (prefs.followSystemDayNightTheme.getValue()) {
             if (isDarkMode) prefs.darkModeTheme else prefs.lightModeTheme

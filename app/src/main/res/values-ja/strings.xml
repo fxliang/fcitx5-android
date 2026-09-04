@@ -481,6 +481,8 @@
     <string name="candidates_font_size">候補のフォントサイズ</string>
     <string name="candidates_padding">候補のパディング</string>
     <string name="candidate_highlight_radius">候補のハイライト角半径</string>
+    <string name="highlight_first_candidate">既定で最初の候補をハイライトする</string>
+    <string name="highlight_first_candidate_summary">選択を移動するまで、最初の候補にハイライト背景を表示する</string>
     <string name="candidates_window_min_width">候補ウィンドウの最小幅</string>
     <string name="candidates_window_padding">候補ウィンドウのパディング</string>
     <string name="restart_fcitx_instance">Fcitx インスタンスを再起動</string>
@@ -560,6 +562,7 @@
     <string name="fontset_sample_candidate">候補の例</string>
     <string name="fontset_sample_popup">ポップアップキー</string>
     <string name="fontset_sample_preedit">プリエディットテキスト</string>
+    <string name="fontset_sample_comment">コメント例</string>
     <string name="picker_category_fullwidth">全角</string>
     <string name="macro_editor_key_event_unmatched">キーイベントの不一致：%1$s の押下と解放の回数が一致しません</string>
     <string name="text_keyboard_layout_qr_export">QR画像で共有</string>
@@ -643,6 +646,7 @@
     <string name="fontset_entry_key_main">キーのメインフォント</string>
     <string name="fontset_entry_popup_key">ポップアップキーのフォント</string>
     <string name="fontset_entry_preedit">プリエディットフォント</string>
+    <string name="fontset_entry_comment">コメントフォント</string>
     <string name="fontset_saved_at">保存しました</string>
     <string name="no_fonts_found">fonts/ にフォントファイルが見つかりません</string>
     <string name="popup_preset_saved_at">保存しました</string>

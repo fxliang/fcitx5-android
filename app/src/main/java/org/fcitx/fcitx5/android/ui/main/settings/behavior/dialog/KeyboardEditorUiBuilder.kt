@@ -33,13 +33,15 @@ class KeyboardEditorUiBuilder(private val activity: AppCompatActivity) {
      * The value is stored as the key's `subLabel`; an empty value selects the default
      * behavior (last symbol layout, "?123").
      */
-    data class SwitchTargetOption(val value: String, val labelRes: Int)
+    data class SwitchTargetOption(val value: String, val labelRes: Int? = null)
 
     /**
      * A selectable numpad symbol for [org.fcitx.fcitx5.android.input.keyboard.NumPadKey].
      * [sym] is the Fcitx keysym sent with NumLock state on press.
      */
-    data class NumPadOption(val label: String, val sym: Int)
+    data class NumPadOption(val label: String, val sym: Int) {
+        override fun toString(): String = label
+    }
 
     companion object {
         private const val DIALOG_LABEL_TEXT_SIZE_SP = 13f
@@ -190,28 +192,33 @@ class KeyboardEditorUiBuilder(private val activity: AppCompatActivity) {
                 weight = 1f
             }
         }
+        val options = SWITCH_TARGET_OPTIONS.toMutableList().apply {
+            if (none { it.value == currentValue }) add(SwitchTargetOption(currentValue))
+        }
         val adapter = object : ArrayAdapter<SwitchTargetOption>(
-            activity, android.R.layout.simple_spinner_item, SWITCH_TARGET_OPTIONS
+            activity, android.R.layout.simple_spinner_item, options
         ) {
+            private fun display(option: SwitchTargetOption): String = option.labelRes?.let(activity::getString)
+                ?: option.value
+
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getView(position, convertView, parent)
                 getItem(position)?.let { option ->
-                    (view as? TextView)?.text = activity.getString(option.labelRes)
+                    (view as? TextView)?.text = display(option)
                 }
                 return view
             }
             override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getDropDownView(position, convertView, parent)
                 getItem(position)?.let { option ->
-                    (view as? TextView)?.text = activity.getString(option.labelRes)
+                    (view as? TextView)?.text = display(option)
                 }
                 return view
             }
         }
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = adapter
-        val position = SWITCH_TARGET_OPTIONS.indexOfFirst { it.value == currentValue }
-        if (position >= 0) spinner.setSelection(position)
+        spinner.setSelection(options.indexOfFirst { it.value == currentValue })
         val row = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -225,7 +232,7 @@ class KeyboardEditorUiBuilder(private val activity: AppCompatActivity) {
 
     /**
      * Create a dropdown selector for a [NumPadKey]'s symbol. Preselects the entry whose
-     * keysym matches [currentSym]; an unknown keysym falls back to the first option.
+     * keysym matches [currentSym]; an unknown keysym is retained as an additional option.
      */
     fun createNumPadSymSpinner(
         container: LinearLayout,
@@ -244,11 +251,15 @@ class KeyboardEditorUiBuilder(private val activity: AppCompatActivity) {
                 weight = 1f
             }
         }
-        val adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_item, NUMPAD_OPTIONS.map { it.label })
+        val options = NUMPAD_OPTIONS.toMutableList().apply {
+            if (none { it.sym == currentSym }) {
+                add(NumPadOption("0x${currentSym.toString(16)}", currentSym))
+            }
+        }
+        val adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_item, options)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = adapter
-        val position = NUMPAD_OPTIONS.indexOfFirst { it.sym == currentSym }
-        if (position >= 0) spinner.setSelection(position)
+        spinner.setSelection(options.indexOfFirst { it.sym == currentSym })
         val row = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL

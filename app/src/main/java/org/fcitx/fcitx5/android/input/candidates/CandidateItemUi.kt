@@ -8,11 +8,15 @@ package org.fcitx.fcitx5.android.input.candidates
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.style.AbsoluteSizeSpan
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
+import androidx.core.text.inSpans
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
+import kotlin.math.roundToInt
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
+import org.fcitx.fcitx5.android.input.candidates.CustomTypefaceSpan
 import org.fcitx.fcitx5.android.input.font.FontProviders
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
@@ -28,8 +32,10 @@ class CandidateItemUi(
     override val ctx: Context,
     val theme: Theme,
     // Optional: external font for batch setting (avoids repeated FontProviders access)
-    private val font: Typeface? = null
+    private val font: Typeface? = null,
+    commentFont: Typeface? = null,
 ) : Ui {
+    private var cachedCommentFont: Typeface? = commentFont
 
     private val text = view(::AutoScaleTextView) {
         scaleMode = AutoScaleTextView.Mode.Proportional
@@ -65,6 +71,14 @@ class CandidateItemUi(
         }
     }
 
+    /**
+     * Cache the comment typeface for the next render. Falls back to the
+     * configured comment_font, then cand_font, then the current view typeface.
+     */
+    fun applyConfiguredCommentTypeface(commentFontOverride: Typeface? = cachedCommentFont) {
+        cachedCommentFont = commentFontOverride ?: FontProviders.resolveCommentTypeface(text.typeface)
+    }
+
     fun setActive(active: Boolean) {
         if (this.active != active) {
             this.active = active
@@ -94,6 +108,8 @@ class CandidateItemUi(
     private fun renderCandidate() {
         val fg = if (active) theme.genericActiveForegroundColor else theme.candidateTextColor
         val altFg = if (active) theme.genericActiveForegroundColor else theme.candidateCommentColor
+        val commentTypeface = cachedCommentFont ?: FontProviders.resolveCommentTypeface(text.typeface)
+        val commentSizePx = FontProviders.commentFontSizePx(ctx)
         text.text = buildSpannedString {
             color(fg) {
                 append(candidate.text)
@@ -102,8 +118,10 @@ class CandidateItemUi(
                 if (candidate.spaceBetweenComment) {
                     append(" ")
                 }
-                color(altFg) {
-                    append(candidate.comment)
+                inSpans(CustomTypefaceSpan(commentTypeface), AbsoluteSizeSpan(commentSizePx, false)) {
+                    color(altFg) {
+                        append(candidate.comment)
+                    }
                 }
             }
         }

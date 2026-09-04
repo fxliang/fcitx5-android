@@ -51,6 +51,7 @@ class HorizontalCandidateComponent :
     private val bar: KawaiiBarComponent by manager.must()
 
     private val fillStyle by AppPrefs.getInstance().keyboard.horizontalCandidateStyle
+    private val highlightFirstCandidate by AppPrefs.getInstance().keyboard.highlightFirstCandidate
     private val maxSpanCountPref by lazy {
         AppPrefs.getInstance().keyboard.run {
             if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
@@ -82,7 +83,7 @@ class HorizontalCandidateComponent :
     private var lastRenderedActiveIndex = Int.MIN_VALUE
     private var pendingLegacyCandidateUpdate: Runnable? = null
 
-    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean) {
         // New input session should not inherit paged-candidate flow state from previous one.
         pagedCandidateFlowActive = false
         lastPagedEventUptimeMs = 0L
@@ -272,8 +273,8 @@ class HorizontalCandidateComponent :
         pendingLegacyCandidateUpdate?.let(view::removeCallbacks)
         pendingLegacyCandidateUpdate = Runnable {
             pendingLegacyCandidateUpdate = null
-            // CandidateListEvent doesn't provide cursor info.
-            updateCandidates(candidates, total, -1)
+            // CandidateListEvent doesn't provide cursor info; the cursor is at 0 by default.
+            updateCandidates(candidates, total, if (highlightFirstCandidate) 0 else -1)
         }.also(view::post)
     }
 
@@ -298,7 +299,8 @@ class HorizontalCandidateComponent :
         val isNewFirstPageSnapshot =
             !data.hasPrev && candidates.asList() != lastPagedCandidatesSnapshot
         if (isNewFirstPageSnapshot) {
-            // New composing snapshot on the first page; keep it unhighlighted until moved.
+            // New composing snapshot on the first page; keep it unhighlighted until moved
+            // (unless the "highlight first candidate" preference is enabled).
             highlightMovedInCurrentComposition = false
             // Reset movement baseline for the new snapshot to avoid false positive move detection.
             lastPagedCursor = normalizedCursor
@@ -313,7 +315,11 @@ class HorizontalCandidateComponent :
             }
         }
 
-        val effectiveActiveIndex = if (!highlightMovedInCurrentComposition && normalizedCursor == 0) {
+        val effectiveActiveIndex = if (
+            !highlightFirstCandidate &&
+            !highlightMovedInCurrentComposition &&
+            normalizedCursor == 0
+        ) {
             -1
         } else {
             normalizedCursor

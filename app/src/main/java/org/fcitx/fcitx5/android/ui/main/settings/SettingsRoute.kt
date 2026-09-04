@@ -38,6 +38,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeFragment
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor
 import org.fcitx.fcitx5.android.utils.parcelable
+import kotlin.reflect.KType
 import kotlin.reflect.typeOf
 
 @Parcelize
@@ -131,6 +132,9 @@ sealed class SettingsRoute : Parcelable {
                         return Json.decodeFromString(value)
                     }
                 }
+
+                val TypeMap: Map<KType, NavType<*>> =
+                    mapOf(typeOf<Params>() to NavType)
             }
         }
 
@@ -178,6 +182,9 @@ sealed class SettingsRoute : Parcelable {
                         return Json.decodeFromString(value)
                     }
                 }
+
+                val TypeMap: Map<KType, NavType<*>> =
+                    mapOf(typeOf<Param>() to NavType)
             }
         }
     }
@@ -264,7 +271,7 @@ sealed class SettingsRoute : Parcelable {
             /* ========== External ========== */
 
             fragment<ListFragment, ListConfig>(
-                typeMap = mapOf(typeOf<ListConfig.Params>() to ListConfig.Params.NavType)
+                typeMap = ListConfig.Params.TypeMap
             )
             fragment<PinyinDictionaryFragment, PinyinDict> {
                 label = ctx.getString(R.string.pinyin_dict)
@@ -274,7 +281,7 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.quickphrase_editor)
             }
             fragment<QuickPhraseEditFragment, QuickPhraseEdit>(
-                typeMap = mapOf(typeOf<QuickPhraseEdit.Param>() to QuickPhraseEdit.Param.NavType)
+                typeMap = QuickPhraseEdit.Param.TypeMap
             )
             fragment<TableInputMethodFragment, TableInputMethods> {
                 label = ctx.getString(R.string.table_im)

@@ -7,11 +7,16 @@ package org.fcitx.fcitx5.android.input.candidates.floating
 
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
+import android.text.style.AbsoluteSizeSpan
 import android.widget.TextView
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
+import androidx.core.text.inSpans
+import kotlin.math.roundToInt
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.input.candidates.CustomTypefaceSpan
+import org.fcitx.fcitx5.android.input.font.FontProviders
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.textView
 
@@ -35,6 +40,8 @@ class LabeledCandidateItemUi(
         val labelFg = if (active) theme.genericActiveForegroundColor else theme.candidateLabelColor
         val fg = if (active) theme.genericActiveForegroundColor else theme.candidateTextColor
         val altFg = if (active) theme.genericActiveForegroundColor else theme.candidateCommentColor
+        val commentTypeface = FontProviders.resolveCommentTypeface(root.typeface)
+        val commentSizePx = FontProviders.commentFontSizePx(root.context)
         root.text = buildSpannedString {
             color(labelFg) {
                 append(candidate.label)
@@ -46,8 +53,10 @@ class LabeledCandidateItemUi(
                 if (candidate.spaceBetweenComment) {
                     append(" ")
                 }
-                color(altFg) {
-                    append(candidate.comment)
+                inSpans(CustomTypefaceSpan(commentTypeface), AbsoluteSizeSpan(commentSizePx, false)) {
+                    color(altFg) {
+                        append(candidate.comment)
+                    }
                 }
             }
         }

@@ -25,7 +25,9 @@ import org.fcitx.fcitx5.android.utils.lazyRoute
 
 class ListFragment : Fragment() {
 
-    val args by lazyRoute<SettingsRoute.ListConfig>()
+    val args by lazyRoute<SettingsRoute.ListConfig>(
+        SettingsRoute.ListConfig.Params.TypeMap
+    )
 
     private val descriptor: ConfigDescriptor<*, *> by lazy {
         args.desc

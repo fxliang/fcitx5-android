@@ -80,6 +80,7 @@ class ThemeColorEditorActivity : AppCompatActivity() {
     private var currentSaturation: Float = 1f
     private var currentValue: Float = 1f
     private var internalTextUpdate = false
+    private val alphaState = ThemeColorEditorAlphaState()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -230,6 +231,7 @@ class ThemeColorEditorActivity : AppCompatActivity() {
             setAlpha(Color.alpha(currentColor))
             setColor(currentColor)
             onAlphaChanged = { alpha ->
+                alphaState.recordAlphaEdit()
                 currentColor = Color.argb(
                     alpha,
                     Color.red(currentColor),
@@ -269,6 +271,7 @@ class ThemeColorEditorActivity : AppCompatActivity() {
                 override fun afterTextChanged(s: android.text.Editable?) {
                     if (internalTextUpdate) return
                     parseArgbHex(s.toString())?.let { parsed ->
+                        alphaState.recordArgbEdit()
                         currentColor = parsed
                         val hsv = FloatArray(3)
                         Color.colorToHSV(currentColor, hsv)
@@ -299,7 +302,7 @@ class ThemeColorEditorActivity : AppCompatActivity() {
 
     private fun updateColorFromHsv() {
         currentColor = Color.HSVToColor(
-            Color.alpha(currentColor),
+            alphaState.alphaForHsvEdit(currentColor),
             floatArrayOf(currentHue, currentSaturation, currentValue)
         )
     }

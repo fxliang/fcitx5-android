@@ -185,6 +185,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         ) {
             soundOnKeyPress.getValue() != InputFeedbackMode.Disabled
         }
+        val customKeySound = ManagedPreference.PString(
+            sharedPreferences,
+            "custom_key_sound",
+            ""
+        ).apply { register() }
         val focusChangeResetKeyboard =
             switch(R.string.reset_keyboard_on_focus_change, "reset_keyboard_on_focus_change", true)
         val expandToolbarByDefault =
@@ -351,6 +356,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             R.string.horizontal_candidate_style,
             "horizontal_candidate_style",
             HorizontalCandidateMode.AutoFillWidth
+        )
+        val highlightFirstCandidate = switch(
+            R.string.highlight_first_candidate,
+            "highlight_first_candidate",
+            false,
+            R.string.highlight_first_candidate_summary
         )
         val expandedCandidateStyle = enumList(
             R.string.expanded_candidate_style,

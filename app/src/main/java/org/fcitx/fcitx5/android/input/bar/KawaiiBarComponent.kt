@@ -771,10 +771,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             idleUi.hideVoiceStatus()
             android.widget.Toast.makeText(service, msg, android.widget.Toast.LENGTH_SHORT).show()
         }
+        // Keep the keyboard on the layout the user was looking at across a voice session.
+        VoiceInputProviderManager.sessionStartedCallback = { service.inputView?.onVoiceInputStarted() }
+        VoiceInputProviderManager.sessionEndedCallback = { service.inputView?.onVoiceInputFinished() }
         IconThemeManager.addOnChangedListener(onIconThemeChangeListener)
     }
 
-    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }

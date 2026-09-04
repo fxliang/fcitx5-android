@@ -130,6 +130,7 @@
     <string name="reload_config">重载配置</string>
     <string name="input_method_options">输入法设置</string>
     <string name="theme">主题</string>
+    <string name="toggle_day_night_theme">亮色/暗色主题</string>
     <string name="key_ripple_effect">启用按键水波纹特效</string>
     <string name="key_border">启用按键边框</string>
     <string name="brightness">亮度</string>
@@ -367,6 +368,7 @@
     <string name="fontset_entry_candidate">候选字体</string>
     <string name="fontset_entry_popup_key">弹出按键字体</string>
     <string name="fontset_entry_preedit">预编辑字体</string>
+    <string name="fontset_entry_comment">注释字体</string>
     <string name="fcitx_daemon">Fcitx 守护程序</string>
     <string name="restarting_fcitx">正在重新启动 Fcitx</string>
     <string name="plugin_needs_reload">检测到插件更改，点此重新加载</string>
@@ -377,6 +379,10 @@
     <string name="following_system_settings">跟随系统设置</string>
     <string name="button_sound">按键音</string>
     <string name="button_sound_volume">按键音音量</string>
+    <string name="custom_key_sound">自定义按键音</string>
+    <string name="custom_key_sound_system_default">系统默认</string>
+    <string name="custom_key_sound_import">导入音频</string>
+    <string name="custom_key_sound_invalid">请选择受支持的音频文件</string>
     <string name="clipboard_return_after_paste">粘贴后返回</string>
     <string name="theme_message_follow_system_day_night_mode_enabled">“跟随系统夜间模式”已启用，不能手动更换主题。</string>
     <string name="disable_it">禁用它</string>
@@ -433,6 +439,8 @@
     <string name="font_size_editor_hint">拖动调整字体大小 (%1$d–%2$d sp)</string>
     <string name="candidates_padding">候选词边距</string>
     <string name="candidate_highlight_radius">候选项高亮圆角半径</string>
+    <string name="highlight_first_candidate">默认高亮第一个候选</string>
+    <string name="highlight_first_candidate_summary">未移动选择时，为默认选中的第一个候选显示高亮底色</string>
     <string name="candidates_window_min_width">候选窗口最小宽度</string>
     <string name="candidates_window_padding">候选窗口边距</string>
     <string name="restart_fcitx_instance">重启 Fcitx 实例</string>
@@ -693,6 +701,7 @@
     <string name="fontset_sample_candidate">候选词示例</string>
     <string name="fontset_sample_popup">弹出键</string>
     <string name="fontset_sample_preedit">预编辑文本</string>
+    <string name="fontset_sample_comment">注释示例</string>
     <string name="picker_category_fullwidth">全角</string>
     <string name="text_keyboard_layout_display_text_mode_invalid">请先填写第 %1$d 行的模式名称和显示文本</string>
     <string name="text_keyboard_layout_display_text_mode_duplicate">模式名称 "%1$s" 已被使用</string>

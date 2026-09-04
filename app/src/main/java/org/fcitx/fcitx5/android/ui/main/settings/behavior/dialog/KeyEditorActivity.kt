@@ -785,7 +785,7 @@ class KeyEditorActivity : AppCompatActivity() {
                             position: Int,
                             id: Long
                         ) {
-                            val option = KeyboardEditorUiBuilder.NUMPAD_OPTIONS.getOrNull(position) ?: return
+                            val option = parent?.getItemAtPosition(position) as? KeyboardEditorUiBuilder.NumPadOption ?: return
                             val current = numPadLabelEdit?.text?.toString().orEmpty()
                             val synced = current.isEmpty() ||
                                 KeyboardEditorUiBuilder.NUMPAD_OPTIONS.any { it.label == current }
@@ -1317,9 +1317,9 @@ class KeyEditorActivity : AppCompatActivity() {
             "LayoutSwitchKey" -> {
                 val label = layoutSwitchLabelEdit?.text?.toString()?.ifEmpty { "?123" }.orEmpty()
                 if (label.isNotEmpty()) draft["label"] = label
-                val target = layoutSwitchTargetSpinner?.selectedItemPosition
-                    ?.let { KeyboardEditorUiBuilder.SWITCH_TARGET_OPTIONS.getOrNull(it)?.value }
-                    ?.orEmpty()
+                val target = (layoutSwitchTargetSpinner?.selectedItem as? KeyboardEditorUiBuilder.SwitchTargetOption)
+                    ?.value
+                    .orEmpty()
                 if (!target.isNullOrEmpty()) draft["subLabel"] = target
                 val swipeLabel = nonMacroSwipeLabelEdit?.text?.toString()?.trim().orEmpty()
                 if (swipeLabel.isNotEmpty()) draft["swipeLabel"] = swipeLabel
@@ -1408,8 +1408,8 @@ class KeyEditorActivity : AppCompatActivity() {
             "NumPadKey" -> {
                 val label = numPadLabelEdit?.text?.toString()?.ifEmpty { "0" }.orEmpty()
                 if (label.isNotEmpty()) draft["label"] = label
-                numPadSymSpinner?.selectedItemPosition
-                    ?.let { KeyboardEditorUiBuilder.NUMPAD_OPTIONS.getOrNull(it)?.sym }
+                (numPadSymSpinner?.selectedItem as? KeyboardEditorUiBuilder.NumPadOption)
+                    ?.sym
                     ?.let { draft["sym"] = it }
                 if (!disableWeightEditing) {
                     parseWeight(simpleWeightEdit?.text?.toString())?.let { draft["weight"] = it }
@@ -1778,9 +1778,9 @@ class KeyEditorActivity : AppCompatActivity() {
 
             "LayoutSwitchKey" -> {
                 newKey["label"] = layoutSwitchLabelEdit?.text?.toString()?.ifEmpty { "?123" }.orEmpty()
-                val target = layoutSwitchTargetSpinner?.selectedItemPosition
-                    ?.let { KeyboardEditorUiBuilder.SWITCH_TARGET_OPTIONS.getOrNull(it)?.value }
-                    ?.orEmpty()
+                val target = (layoutSwitchTargetSpinner?.selectedItem as? KeyboardEditorUiBuilder.SwitchTargetOption)
+                    ?.value
+                    .orEmpty()
                 if (!target.isNullOrEmpty()) newKey["subLabel"] = target
                 val swipeLabel = nonMacroSwipeLabelEdit?.text?.toString()?.trim().orEmpty()
                 if (swipeLabel.isNotEmpty()) newKey["swipeLabel"] = swipeLabel
@@ -1873,8 +1873,8 @@ class KeyEditorActivity : AppCompatActivity() {
 
             "NumPadKey" -> {
                 newKey["label"] = numPadLabelEdit?.text?.toString()?.ifEmpty { "0" }.orEmpty()
-                numPadSymSpinner?.selectedItemPosition
-                    ?.let { KeyboardEditorUiBuilder.NUMPAD_OPTIONS.getOrNull(it)?.sym }
+                (numPadSymSpinner?.selectedItem as? KeyboardEditorUiBuilder.NumPadOption)
+                    ?.sym
                     ?.let { newKey["sym"] = it }
                 if (!disableWeightEditing) {
                     parseWeight(simpleWeightEdit?.text?.toString())?.let { newKey["weight"] = it }

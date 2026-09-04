@@ -12,6 +12,8 @@ object UserConfigFiles {
     private const val TEXT_KEYBOARD_LAYOUT_DEFAULT_FILE_NAME = "TextKeyboardLayout.json"
     private const val TEXT_KEYBOARD_LAYOUT_PREFIX = "TextKeyboardLayout."
     private const val JSON_SUFFIX = ".json"
+    private const val KEY_SOUND_DIR_NAME = "key_sounds"
+    private val AUDIO_FILE_NAME = Regex("^[A-Za-z0-9._ -]+\\.(?i:wav|mp3|ogg|m4a|flac)$")
     private val TEXT_KEYBOARD_LAYOUT_BACKUP_FILE_NAME = Regex(
         "^TextKeyboardLayout(?:\\..+)?_backup_\\d{8}_\\d{6}(?:_.*)?\\.json$"
     )
@@ -21,6 +23,22 @@ object UserConfigFiles {
     fun configDir(): File? = externalFilesRoot()?.let { File(it, "config") }
 
     fun fontsDir(): File? = externalFilesRoot()?.let { File(it, "fonts") }
+
+    fun keySoundsDir(): File? = configDir()?.let { File(it, KEY_SOUND_DIR_NAME) }
+
+    fun keySoundFile(name: String): File? {
+        if (!AUDIO_FILE_NAME.matches(name)) return null
+        return keySoundsDir()?.let { File(it, name) }
+    }
+
+    fun listKeySoundFiles(): List<String> = keySoundsDir()
+        ?.listFiles()
+        ?.asSequence()
+        ?.filter { it.isFile && AUDIO_FILE_NAME.matches(it.name) }
+        ?.map { it.name }
+        ?.sortedWith(String.CASE_INSENSITIVE_ORDER)
+        ?.toList()
+        .orEmpty()
 
     fun textKeyboardLayoutJson(): File? = textKeyboardLayoutJson(DEFAULT_TEXT_KEYBOARD_LAYOUT_PROFILE)
 

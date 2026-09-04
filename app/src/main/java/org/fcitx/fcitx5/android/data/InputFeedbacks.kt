@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.data
 
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.SoundPool
 import android.os.Build
 import android.os.VibrationEffect
 import android.provider.Settings
@@ -13,6 +15,7 @@ import android.view.View
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
+import org.fcitx.fcitx5.android.input.config.UserConfigFiles
 import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.audioManager
 import org.fcitx.fcitx5.android.utils.getSystemSettings
@@ -140,6 +143,66 @@ object InputFeedbacks {
     }
 
     private val audioManager = appContext.audioManager
+    private val customKeySound by keyboardPrefs.customKeySound
+    @Volatile
+    private var customSoundPool: SoundPool? = null
+    @Volatile
+    private var customSoundId = 0
+    @Volatile
+    private var customSoundReady = false
+    @Volatile
+    private var loadedCustomKeySound = ""
+
+    init {
+        keyboardPrefs.customKeySound.registerOnChangeListener { _, _ -> reloadCustomSound() }
+        reloadCustomSound()
+    }
+
+    private fun reloadCustomSound() {
+        customSoundPool?.release()
+        customSoundPool = null
+        customSoundId = 0
+        customSoundReady = false
+        loadedCustomKeySound = customKeySound
+        val file = UserConfigFiles.keySoundFile(customKeySound) ?: return
+        if (!file.isFile) return
+
+        val pool = SoundPool.Builder()
+            .setMaxStreams(4)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            .build()
+        customSoundPool = pool
+        pool.setOnLoadCompleteListener { loadedPool, sampleId, status ->
+            if (loadedPool === customSoundPool && sampleId == customSoundId) {
+                customSoundReady = status == 0
+                if (!customSoundReady) {
+                    customSoundPool = null
+                    customSoundId = 0
+                    loadedPool.release()
+                }
+            }
+        }
+        val soundId = runCatching { pool.load(file.path, 1) }.getOrElse {
+            pool.release()
+            customSoundPool = null
+            0
+        }
+        customSoundId = soundId
+    }
+
+    private fun playCustomSound(volume: Int): Boolean {
+        if (customKeySound.isBlank()) return false
+        if (loadedCustomKeySound != customKeySound) reloadCustomSound()
+        val pool = customSoundPool ?: return false
+        if (customSoundId == 0 || !customSoundReady) return false
+        val gain = if (volume == 0) 1f else volume / 100f
+        return pool.play(customSoundId, gain, gain, 1, 0, 1f) != 0
+    }
 
     fun soundEffect(effect: SoundEffect) {
         when (soundOnKeyPress) {
@@ -147,13 +210,14 @@ object InputFeedbacks {
             InputFeedbackMode.Disabled -> return
             InputFeedbackMode.FollowingSystem -> if (!systemSoundEffects) return
         }
+        val volume = soundOnKeyPressVolume
+        if (playCustomSound(volume)) return
         val fx = when (effect) {
             SoundEffect.Standard -> AudioManager.FX_KEYPRESS_STANDARD
             SoundEffect.SpaceBar -> AudioManager.FX_KEYPRESS_SPACEBAR
             SoundEffect.Delete -> AudioManager.FX_KEYPRESS_DELETE
             SoundEffect.Return -> AudioManager.FX_KEYPRESS_RETURN
         }
-        val volume = soundOnKeyPressVolume
         if (volume == 0) {
             audioManager.playSoundEffect(fx, -1f)
         } else {

@@ -137,6 +137,7 @@
     <string name="reload_config">Reload Config</string>
     <string name="input_method_options">Input Method Options</string>
     <string name="theme">Theme</string>
+    <string name="toggle_day_night_theme">Day/Night Theme</string>
     <string name="key_ripple_effect">Enable key ripple effect</string>
     <string name="key_border">Enable key border</string>
     <string name="brightness">Brightness</string>
@@ -318,6 +319,7 @@
     <string name="path_conflict">Path \"%1$s\" is already owned by %2$s</string>
     <string name="main_program">main program</string>
     <string name="edit_theme">Edit Theme</string>
+    <string name="reset_theme_colors">Reset theme colors</string>
     <string name="show_voice_input_button">Show voice input button</string>
     <string name="edit_fontset">Font Settings</string>
     <string name="edit_popup_preset">Popup Character Settings</string>
@@ -377,6 +379,7 @@
     <string name="fontset_entry_candidate">Candidate Font</string>
     <string name="fontset_entry_popup_key">Popup Key Font</string>
     <string name="fontset_entry_preedit">Preedit Font</string>
+    <string name="fontset_entry_comment">Comment Font</string>
     <string name="font_size">Font Size</string>
     <string name="font_size_value">%1$d sp</string>
     <string name="font_size_editor_title">%1$s - Font Size</string>
@@ -394,6 +397,10 @@
     <string name="following_system_settings">Follow system settings</string>
     <string name="button_sound">Sound on keypress</string>
     <string name="button_sound_volume">Keypress sound volume</string>
+    <string name="custom_key_sound">Custom keypress sound</string>
+    <string name="custom_key_sound_system_default">System default</string>
+    <string name="custom_key_sound_import">Import audio</string>
+    <string name="custom_key_sound_invalid">Please select a supported audio file</string>
     <string name="clipboard_return_after_paste">Return after pasting</string>
     <string name="theme_message_follow_system_day_night_mode_enabled">Cannot switch theme manually while \"Follow system day/night mode\" is enabled.</string>
     <string name="disable_it">Disable it</string>
@@ -445,6 +452,8 @@
     <string name="candidates_font_size">Candidate word font size</string>
     <string name="candidates_padding">Candidate word padding</string>
     <string name="candidate_highlight_radius">Candidate highlight radius</string>
+    <string name="highlight_first_candidate">Highlight first candidate by default</string>
+    <string name="highlight_first_candidate_summary">Show the highlight background on the first candidate until the selection is moved</string>
     <string name="candidates_window_min_width">Candidate window minimum width</string>
     <string name="candidates_window_padding">Candidate window padding</string>
     <string name="restart_fcitx_instance">Restart fcitx instance</string>
@@ -688,6 +697,7 @@
     <string name="fontset_sample_candidate">Candidate Example</string>
     <string name="fontset_sample_popup">Popup Key</string>
     <string name="fontset_sample_preedit">Preedit Text</string>
+    <string name="fontset_sample_comment">Comment Note</string>
     <string name="picker_category_fullwidth">Fullwidth</string>
     <string name="text_keyboard_layout_display_text_mode_invalid">Please fill in row %1$d before adding a new mode</string>
     <string name="text_keyboard_layout_display_text_mode_duplicate">Mode name "%1$s" is already in use</string>

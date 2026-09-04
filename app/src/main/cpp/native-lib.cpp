@@ -442,6 +442,23 @@ public:
         p_instance->save();
     }
 
+    // Settings may stop after changing a frontend option. Rime's save() syncs
+    // user data, so keep the ordinary settings path independent from Rime.
+    void saveWithoutRime() {
+        p_instance->inputMethodManager().save();
+        auto &addonManager = p_instance->addonManager();
+        const auto &loadedAddons = addonManager.loadedAddonNames();
+        for (auto iter = loadedAddons.rbegin(), end = loadedAddons.rend();
+             iter != end; iter++) {
+            if (*iter == "rime") {
+                continue;
+            }
+            if (auto *addon = addonManager.addon(*iter)) {
+                addon->save();
+            }
+        }
+    }
+
     void exit() {
         // Make sure that the exec doesn't get blocked
         uv_stop(get_event_base());
@@ -754,6 +771,13 @@ JNIEXPORT void JNICALL
 Java_org_fcitx_fcitx5_android_core_Fcitx_saveFcitxState(JNIEnv *env, jclass clazz) {
     RETURN_IF_NOT_RUNNING
     Fcitx::Instance().save();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_org_fcitx_fcitx5_android_core_Fcitx_saveFcitxStateWithoutRime(JNIEnv *env, jclass clazz) {
+    RETURN_IF_NOT_RUNNING
+    Fcitx::Instance().saveWithoutRime();
 }
 
 extern "C"

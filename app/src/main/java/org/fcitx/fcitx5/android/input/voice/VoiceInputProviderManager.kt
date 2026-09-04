@@ -112,6 +112,9 @@ object VoiceInputProviderManager {
     var voiceReadyCallback: (() -> Unit)? = null           // set "listening" status
     var voiceFinishedCallback: (() -> Unit)? = null        // hide status on finish
     var voiceErrorCallback: ((String) -> Unit)? = null     // show error toast
+    // Layout preservation around a voice session (see KeyboardWindow.onVoiceInputStarted/Finished).
+    var sessionStartedCallback: (() -> Unit)? = null
+    var sessionEndedCallback: (() -> Unit)? = null
 
     private data class QueuedAudio(
         val pcm: ByteArray,
@@ -429,6 +432,7 @@ object VoiceInputProviderManager {
         voiceSessionTerminalized = false
         sessionReady = false
         sessionActive = true
+        ContextCompat.getMainExecutor(appContext).execute { sessionStartedCallback?.invoke() }
 
         startPreRollCapture(service, onLevel, onError)
 
@@ -1005,6 +1009,7 @@ object VoiceInputProviderManager {
                 .onFailure { Timber.w(it, "keepalive unbind on stop") }
         }
         keepAliveConnection = null
+        ContextCompat.getMainExecutor(appContext).execute { sessionEndedCallback?.invoke() }
     }
 
     private fun scheduleWarmConnectionRelease(context: Context) {
@@ -1066,6 +1071,7 @@ object VoiceInputProviderManager {
             runCatching { ContextCompat.startForegroundService(context, intent) }
                 .onFailure { Timber.w(it, "stop floating fallback failed") }
         }
+        ContextCompat.getMainExecutor(appContext).execute { sessionEndedCallback?.invoke() }
         voiceFinishedCallback?.invoke()
     }
 }

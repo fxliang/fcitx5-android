@@ -390,6 +390,7 @@ class CustomThemeActivity : AppCompatActivity() {
         onCancel: () -> Unit
     ): View {
         var editingColor = initialColor
+        val alphaState = ThemeColorEditorAlphaState()
         var currentHue = 0f
         var currentSaturation = 1f
         var currentValue = 1f
@@ -403,7 +404,10 @@ class CustomThemeActivity : AppCompatActivity() {
         
         // Local function to update color from HSV
         fun updateColor() {
-            val color = Color.HSVToColor(Color.alpha(editingColor), floatArrayOf(currentHue, currentSaturation, currentValue))
+            val color = Color.HSVToColor(
+                alphaState.alphaForHsvEdit(editingColor),
+                floatArrayOf(currentHue, currentSaturation, currentValue)
+            )
             editingColor = color
         }
         
@@ -484,6 +488,7 @@ class CustomThemeActivity : AppCompatActivity() {
                     setAlpha(Color.alpha(editingColor))
                     setColor(editingColor)
                     onAlphaChanged = { alpha ->
+                        alphaState.recordAlphaEdit()
                         editingColor = Color.argb(
                             alpha,
                             Color.red(editingColor),
@@ -524,6 +529,7 @@ class CustomThemeActivity : AppCompatActivity() {
                         override fun afterTextChanged(s: android.text.Editable?) {
                             if (internalTextUpdate) return
                             parseArgbHex(s.toString())?.let { color ->
+                                alphaState.recordArgbEdit()
                                 editingColor = color
                                 val hsv = FloatArray(3)
                                 Color.colorToHSV(editingColor, hsv)

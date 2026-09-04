@@ -42,7 +42,6 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
-import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.ui.main.settings.preview.PreviewInputMethodEntry
@@ -128,19 +127,6 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var backgroundJob: Job? = null
     private var backgroundGeneration = 0L
-
-    private inline fun <T> withPreviewIme(previewIme: InputMethodEntry, block: () -> T): T {
-        val originalIme = TextKeyboard.ime
-        TextKeyboard.ime = previewIme
-        return try {
-            block()
-        } finally {
-            // Do not overwrite if real IME already updated global state during preview rendering.
-            if (TextKeyboard.ime === previewIme) {
-                TextKeyboard.ime = originalIme
-            }
-        }
-    }
 
     private inner class PreviewBlurMaskView : View(ctx) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
@@ -603,7 +589,10 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         // First-time setup: create new keyboard view
         if (!this::fakeKeyboardWindow.isInitialized) {
             isUpdatingTheme = true
-            fakeKeyboardWindow = TextKeyboard(ctx, theme)
+            // The preview keyboard owns its layout state, so its preview IME never reaches the
+            // real keyboard. Pass it at construction time to build the right layout at once.
+            val previewIme = PreviewInputMethodEntry.create()
+            fakeKeyboardWindow = TextKeyboard(ctx, theme, previewIme, isPreview = true)
             currentTheme = theme
 
             // Match KawaiiBar behavior: use barColor for Builtin themes without border
@@ -617,11 +606,8 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             }
 
             fakeKeyboardWindow.post {
-                val previewIme = PreviewInputMethodEntry.create()
                 fakeKeyboardWindow.onAttach()
-                withPreviewIme(previewIme) {
-                    fakeKeyboardWindow.onInputMethodUpdate(previewIme)
-                }
+                fakeKeyboardWindow.onInputMethodUpdate(previewIme)
                 fakeKeyboardWindow.setTextScale(sizeScale)
                 fakeKeyboardWindow.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
                     blurMaskView.markKeyRegionsDirty()
@@ -651,13 +637,12 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             fakeKeyboardWindow.post {
                 try {
                     isUpdatingTheme = true
-                    val previewIme = PreviewInputMethodEntry.create()
                     if (forceRefresh || sameTheme) {
                         // Config changed: rebuild layout
-                        // refreshStyle() reads latest config from ThemeManager.prefs
-                        withPreviewIme(previewIme) {
-                            fakeKeyboardWindow.refreshStyle()
-                        }
+                        // refreshStyle() reads latest config from ThemeManager.prefs.
+                        // The keyboard still holds its own preview IME, so the rebuilt layout
+                        // stays the previewed one without touching global state.
+                        fakeKeyboardWindow.refreshStyle()
                     } else {
                         // Theme changed: update colors without rebuilding
                         currentTheme = theme

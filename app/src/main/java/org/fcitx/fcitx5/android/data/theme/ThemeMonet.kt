@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.data.theme
 
 import android.content.Context
 import android.os.Build
+import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.appContext
 
 // Ref:
@@ -209,7 +210,8 @@ object ThemeMonet {
             altKeyTextColor = getColor(mapping.altKeyTextColor),
             accentKeyBackgroundColor = getColor(mapping.accentKeyBackgroundColor),
             accentKeyTextColor = getColor(mapping.accentKeyTextColor),
-            keyPressHighlightColor = getColor(mapping.keyPressHighlightColor),
+            keyPressHighlightColor = getColor(mapping.keyPressHighlightColor)
+                .alpha(if (isDark) 0.2f else 0.12f),
             keyShadowColor = getColor(mapping.keyShadowColor),
             popupBackgroundColor = getColor(mapping.popupBackgroundColor),
             popupTextColor = getColor(mapping.popupTextColor),

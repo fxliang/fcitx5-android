@@ -316,6 +316,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     if (text.isNotBlank()) {
                         lifecycleScope.launch { commitVoiceText(text) }
                         VoiceInputProviderManager.floatingCommitListener?.invoke(text)
+                        // Floating fallback commits end the session without a provider
+                        // onSessionEnded; restore the pre-voice layout here as well.
+                        inputView?.onVoiceInputFinished()
                     }
                 }
             }

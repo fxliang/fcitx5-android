@@ -8,6 +8,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.drawable.Drawable
+import android.os.Looper
 import android.view.View
 import android.widget.ImageView
 import androidx.annotation.Keep
@@ -34,10 +35,45 @@ internal fun interface NumericLayoutFallbackListener {
 }
 
 @SuppressLint("ViewConstructor")
-class TextKeyboard(
+class TextKeyboard private constructor(
     context: Context,
-    theme: Theme
-) : BaseKeyboard(context, theme, ::getLayout, ::getAuxBarConfig, ::getAuxBarKeyDefs) {
+    theme: Theme,
+    initialLayoutState: TextKeyboardLayoutState,
+    private val isPreview: Boolean
+) : BaseKeyboard(
+    context,
+    theme,
+    initialLayoutState::getLayout,
+    { initialLayoutState.auxBarConfig },
+    initialLayoutState::getAuxBarKeyDefs
+) {
+
+    /**
+     * @param initialIme the input method this keyboard renders for. Previews pass their own
+     * preview entry, so they can no longer overwrite the real keyboard's layout state; the
+     * real keyboard is seeded with the current input method by [KeyboardWindow] to avoid an
+     * initial default layout followed by an immediate rebuild.
+     *
+     * @param isPreview whether this keyboard is a settings preview. Previews keep rendering
+     * their own layout and are excluded from numeric-override broadcasts.
+     */
+    constructor(
+        context: Context,
+        theme: Theme,
+        initialIme: InputMethodEntry? = null,
+        isPreview: Boolean = false
+    ) : this(context, theme, beginConstruction(TextKeyboardLayoutState(initialIme)), isPreview)
+
+    /**
+     * Assigned only after the superclass constructor has returned: [BaseKeyboard]'s init block
+     * already resolves a layout (`reloadLayout` -> [currentLayoutSignature]), and instance
+     * fields are still unset at that point. Never read this directly — use [layoutState].
+     */
+    private val ownLayoutState: TextKeyboardLayoutState? = initialLayoutState
+
+    /** This keyboard's layout state, also readable while its constructor is still running. */
+    private val layoutState: TextKeyboardLayoutState
+        get() = ownLayoutState ?: constructingLayoutState
 
     enum class CapsState { None, Once, Lock }
 
@@ -48,6 +84,33 @@ class TextKeyboard(
         private const val LAYOUT_META_HEIGHT_PERCENT_LANDSCAPE_KEY = "keyboard_height_percent_landscape"
         private const val LAYOUT_META_AUX_BAR_KEY = "aux_bar"
         private var lastModified = 0L
+
+        /**
+         * Layout state of the keyboard whose constructor is currently running. [BaseKeyboard]
+         * resolves a layout from its own init block, before the instance field is assigned, so
+         * early override calls read the state through here. Keyboards are only constructed on
+         * the main thread and the instance field takes over as soon as the superclass
+         * constructor returns, so a single slot is enough.
+         */
+        @Volatile
+        private var constructingLayoutState = TextKeyboardLayoutState()
+
+        private fun beginConstruction(
+            state: TextKeyboardLayoutState
+        ): TextKeyboardLayoutState {
+            check(Looper.myLooper() == Looper.getMainLooper()) {
+                "TextKeyboard must be constructed on the main thread (single-slot construction state)"
+            }
+            constructingLayoutState = state
+            return state
+        }
+
+        /**
+         * The real keyboard's current input method, kept in sync by [KeyboardWindow]. Only
+         * window-level state that must follow the real input method reads this (keyboard
+         * height overrides, layer targets, the base entry of preview IMEs). Per-instance
+         * layout resolution uses [TextKeyboardLayoutState.ime] instead.
+         */
         var ime: InputMethodEntry? = null
         private var listenerRegistered = false
         private var resolvedLayoutHeightPercentOverride: Int? = null
@@ -81,7 +144,7 @@ class TextKeyboard(
             attachedKeyboards.removeAll { it.get() == null }
             living.forEach { keyboard ->
                 keyboard.refreshStyle()
-                ime?.let { keyboard.updateSpaceLabel(it) }
+                keyboard.refreshSpaceLabelFromState()
             }
         }
 
@@ -126,8 +189,6 @@ class TextKeyboard(
         private var forcedLayoutKey: String? = null
         private val numericOverride = NumericLayoutOverrideController()
         private var numericLayoutFallbackTarget: WeakReference<NumericLayoutFallbackListener>? = null
-        var resolvedAuxBarConfig: AuxBarConfig? = null
-        var resolvedAuxBarKeys: List<Map<String, Any?>> = emptyList()
 
         /**
          * Clear KeyDef layout cache. Call this after saving layout changes.
@@ -153,7 +214,7 @@ class TextKeyboard(
             forEachAttachedKeyboard { keyboard ->
                 keyboard.refreshStyle()
                 keyboard.markLayoutSignatureApplied()
-                ime?.let { keyboard.updateSpaceLabel(it) }
+                keyboard.refreshSpaceLabelFromState()
             }
         }
 
@@ -162,14 +223,34 @@ class TextKeyboard(
 
         @Synchronized
         fun activateManualNumericLayout(layoutKey: String): Boolean {
-            val wasActive = numericOverride.activateManual(layoutKey)
+            if (!numericOverride.activateManual(layoutKey)) {
+                return false
+            }
             setForcedLayoutKey(layoutKey)
-            return wasActive
+            return true
         }
 
         @Synchronized
         fun releaseManualNumericLayout(): Boolean {
             if (!numericOverride.releaseManual()) return false
+            setForcedLayoutKey(null)
+            return true
+        }
+
+        /**
+         * Release ONLY the manually activated numeric layout because the input method
+         * changed (language switch). Called from [KeyboardWindow.onImeUpdate] BEFORE the
+         * layer latches are cleared; otherwise the forced-layout fallback would resurrect
+         * the remembered manual key over the newly selected keyboard ("switching
+         * Chinese/English lands on the number pad", regression introduced by bc82c97e).
+         * Session-based overrides for numeric editors are preserved and still survive
+         * IME updates while their editor stays numeric.
+         *
+         * @return whether a manual override was actually released.
+         */
+        @Synchronized
+        fun releaseManualNumericLayoutOnImeUpdate(): Boolean {
+            if (!numericOverride.releaseManualOnImeUpdate()) return false
             setForcedLayoutKey(null)
             return true
         }
@@ -183,7 +264,10 @@ class TextKeyboard(
         @Synchronized
         fun setNumericLayoutKey(layoutKey: String?) {
             val normalized = layoutKey?.trim()?.takeIf { it.isNotEmpty() }
-            if (numericOverride.sessionKey == normalized && forcedLayoutKey == normalized) return
+            if (numericOverride.sessionKey == normalized &&
+                forcedLayoutKey == normalized &&
+                !numericOverride.dismissed
+            ) return
             numericOverride.beginSession(normalized)
             // Latched layers were just cleared by the caller; the forced slot now carries
             // the numeric layout and keeps falling back to it for the rest of the session.
@@ -192,7 +276,7 @@ class TextKeyboard(
             forEachAttachedKeyboard { keyboard ->
                 keyboard.refreshStyle()
                 refreshedAny = true
-                ime?.let { keyboard.updateSpaceLabel(it) }
+                keyboard.refreshSpaceLabelFromState()
             }
             // Mark the layout signature as applied only for keyboards that actually reloaded
             // just now. Otherwise the next attach/onInputMethodUpdate must still see the
@@ -211,6 +295,10 @@ class TextKeyboard(
         @Synchronized
         fun isNumericLayoutActive(): Boolean = numericOverride.sessionKey != null
 
+        @Synchronized
+        fun isNumericLayoutShowing(): Boolean =
+            numericOverride.sessionKey != null || numericOverride.manualKey != null
+
         /**
          * Release the numeric-input layout override for the rest of the current session,
          * clearing both the session slot and the forced slot. Used when the user explicitly
@@ -227,15 +315,46 @@ class TextKeyboard(
             forEachAttachedKeyboard { keyboard ->
                 keyboard.refreshStyle()
                 keyboard.markLayoutSignatureApplied()
-                ime?.let { keyboard.updateSpaceLabel(it) }
+                keyboard.refreshSpaceLabelFromState()
+            }
+        }
+
+        /**
+         * Snapshot the current numeric override state (session/manual/forced slots).
+         * Voice input commits text directly through the InputConnection and bypasses
+         * fcitx's preedit pipeline, so [KeyboardWindow] snapshots this state before a
+         * voice session starts and restores it afterwards to keep the keyboard on the
+         * layout the user was looking at.
+         */
+        @Synchronized
+        internal fun snapshotNumericLayoutOverride(): NumericLayoutOverrideController.Snapshot =
+            numericOverride.snapshot()
+
+        /**
+         * Restore a numeric override state captured by [snapshotNumericLayoutOverride]
+         * and re-apply it to attached keyboards.
+         */
+        @Synchronized
+        internal fun restoreNumericLayoutOverride(snapshot: NumericLayoutOverrideController.Snapshot) {
+            numericOverride.restore(snapshot)
+            val normalized = numericOverride.forcedKey
+            if (forcedLayoutKey == normalized) return
+            forcedLayoutKey = normalized
+            forEachAttachedKeyboard { keyboard ->
+                keyboard.refreshStyle()
+                keyboard.markLayoutSignatureApplied()
+                keyboard.refreshSpaceLabelFromState()
             }
         }
 
         @Synchronized
-        private fun forEachAttachedKeyboard(action: (TextKeyboard) -> Unit) {
+        private fun forEachAttachedKeyboard(
+            includePreview: Boolean = false,
+            action: (TextKeyboard) -> Unit
+        ) {
             val living = attachedKeyboards.mapNotNull { it.get() }
             attachedKeyboards.removeAll { it.get() == null }
-            living.forEach(action)
+            living.filter { includePreview || !it.isPreview }.forEach(action)
         }
 
         /**
@@ -263,12 +382,14 @@ class TextKeyboard(
          */
         @Synchronized
         fun revalidateNumericLayoutOverride(): Boolean {
-            val current = numericOverride.sessionKey ?: return false
-            val resolved = resolveNumericLayoutKey()
-            if (resolved == current) return false
-            val dropped = numericOverride.revalidate(resolved)
-            if (forcedLayoutKey == current) forcedLayoutKey = numericOverride.forcedKey
-            return dropped
+            val sessionDropped = numericOverride.revalidateSession(resolveNumericLayoutKey())
+            val manualDropped = numericOverride.manualKey?.let { manualKey ->
+                numericOverride.revalidateManual(textLayoutJson?.let { containsLayoutKey(it, manualKey) } == true)
+            } ?: false
+            if (forcedLayoutKey != numericOverride.forcedKey) {
+                forcedLayoutKey = numericOverride.forcedKey
+            }
+            return sessionDropped || manualDropped
         }
 
         @Synchronized
@@ -523,8 +644,6 @@ class TextKeyboard(
             return AuxBarConfig(position, sizePercent)
         }
 
-        fun getAuxBarConfig(): AuxBarConfig? = resolvedAuxBarConfig
-
         /**
          * 解析辅助选择栏的附加自定义按键（无 tabs 时用于填充辅助选择栏）。
          */
@@ -537,12 +656,12 @@ class TextKeyboard(
             return rows.firstOrNull() ?: emptyList()
         }
 
-        fun getAuxBarKeyDefs(): List<KeyDef> {
-            val currentIme = ime
+        internal fun getAuxBarKeyDefs(state: TextKeyboardLayoutState): List<KeyDef> {
+            val currentIme = state.ime
             val subModeLabel = currentIme?.subMode?.label.orEmpty()
             val subModeName = currentIme?.subMode?.name.orEmpty()
             val schemaId = schemaIdFromSubModeIcon(currentIme?.subMode?.icon.orEmpty())
-            return resolvedAuxBarKeys.mapNotNull { keyMap ->
+            return state.auxBarKeys.mapNotNull { keyMap ->
                 runCatching {
                     val jsonObject = JsonObject(
                         keyMap.mapValues { (_, v) -> LayoutJsonUtils.convertToJsonProperty(v) }
@@ -693,7 +812,9 @@ class TextKeyboard(
             return json[displayName]?.jsonArray
         }
 
-        fun getLayout(): List<List<KeyDef>> {
+        internal fun getLayout(state: TextKeyboardLayoutState): List<List<KeyDef>> {
+            // Resolve against the caller's own input method, never the shared companion one.
+            val ime = state.ime
             val imeName = ime?.uniqueName
             val subModeLabel = ime?.subMode?.label ?: ""
             val subModeName = ime?.subMode?.name ?: ""
@@ -720,19 +841,19 @@ class TextKeyboard(
                         } else {
                             parseLayoutHeightPercentOverride(json[baseName])
                         }
-                        resolvedAuxBarConfig = if (forcedSub.isNotEmpty()) {
+                        state.auxBarConfig = if (forcedSub.isNotEmpty()) {
                             parseAuxBarConfig((json[baseName] as? JsonObject)?.get(forcedSub))
                                 ?: parseAuxBarConfig(json[baseName])
                         } else {
                             parseAuxBarConfig(json[baseName])
                         }
-                        resolvedAuxBarKeys = if (forcedSub.isNotEmpty()) {
+                        state.auxBarKeys = if (forcedSub.isNotEmpty()) {
                             parseAuxBarKeys((json[baseName] as? JsonObject)?.get(forcedSub))
                                 .ifEmpty { parseAuxBarKeys(json[baseName]) }
                         } else {
                             parseAuxBarKeys(json[baseName])
                         }
-                        cachedAuxBarConfigs[cacheKey] = resolvedAuxBarConfig
+                        cachedAuxBarConfigs[cacheKey] = state.auxBarConfig
                         return cachedKeyDefLayouts.getOrPut(cacheKey) {
                             forcedLayout.map { rowElement ->
                                 LayoutJsonUtils.parseKeyJsonArray(rowElement.jsonArray, showLangSwitch)
@@ -775,17 +896,17 @@ class TextKeyboard(
                             resolvedLayoutHeightPercentOverride =
                                 parseLayoutHeightPercentOverride(subModeLayoutElement)
                                     ?: parseLayoutHeightPercentOverride(imeLayoutElement)
-                            resolvedAuxBarConfig =
+                            state.auxBarConfig =
                                 parseAuxBarConfig(subModeLayoutElement)
                                     ?: parseAuxBarConfig(imeLayoutElement)
-                            resolvedAuxBarKeys =
+                            state.auxBarKeys =
                                 parseAuxBarKeys(subModeLayoutElement)
                                     .ifEmpty { parseAuxBarKeys(imeLayoutElement) }
                             // Use a cache key that includes submode and showLangSwitch for proper caching
                             // Include showLangSwitch in cache key so layout is re-created when setting changes
                             val cacheSubMode = matchedSubModeKey ?: "default"
                             val cacheKey = "$layoutKey:$cacheSubMode:$showLangSwitch:$displayTextContextCacheKey"
-                            cachedAuxBarConfigs[cacheKey] = resolvedAuxBarConfig
+                            cachedAuxBarConfigs[cacheKey] = state.auxBarConfig
                             return cachedKeyDefLayouts.getOrPut(cacheKey) {
                                 layoutArray.map { rowElement ->
                                     LayoutJsonUtils.parseKeyJsonArray(rowElement.jsonArray, showLangSwitch)
@@ -805,12 +926,12 @@ class TextKeyboard(
                     // Fallback to global "default" layout
                     json["default"]?.let { layoutElement ->
                         resolvedLayoutHeightPercentOverride = parseLayoutHeightPercentOverride(layoutElement)
-                        resolvedAuxBarConfig = parseAuxBarConfig(layoutElement)
-                        resolvedAuxBarKeys = parseAuxBarKeys(layoutElement)
+                        state.auxBarConfig = parseAuxBarConfig(layoutElement)
+                        state.auxBarKeys = parseAuxBarKeys(layoutElement)
                         val layoutArray = parseLayoutArray(layoutElement)
                         if (layoutArray != null) {
                             val cacheKey = "default:$showLangSwitch:$lastRawModified"
-                            cachedAuxBarConfigs[cacheKey] = resolvedAuxBarConfig
+                            cachedAuxBarConfigs[cacheKey] = state.auxBarConfig
                             return cachedKeyDefLayouts.getOrPut(cacheKey) {
                                 layoutArray.map { rowElement ->
                                     LayoutJsonUtils.parseKeyJsonArray(rowElement.jsonArray, showLangSwitch)
@@ -822,8 +943,8 @@ class TextKeyboard(
                 }
             }
             resolvedLayoutHeightPercentOverride = null
-            resolvedAuxBarConfig = null
-            resolvedAuxBarKeys = emptyList()
+            state.auxBarConfig = null
+            state.auxBarKeys = emptyList()
             return getDefaultLayout(showLangSwitch)
         }
 
@@ -947,7 +1068,7 @@ class TextKeyboard(
 
     @Keep
     private val spaceKeyLabelModeListener = ManagedPreference.OnChangeListener<SpaceKeyLabelMode> { _, _ ->
-        updateSpaceLabel(TextKeyboard.ime)
+        refreshSpaceLabelFromState()
     }
 
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
@@ -956,7 +1077,7 @@ class TextKeyboard(
         // BaseKeyboard has already built the initial layout. If the current IME was supplied
         // before construction, remember its signature so onInputMethodUpdate does not rebuild
         // the exact same custom layout immediately afterwards.
-        ime?.let { lastLayoutSignature = layoutSignature(it) }
+        layoutState.ime?.let { lastLayoutSignature = layoutSignature(it) }
     }
 
     private val textKeys: List<TextKeyView>
@@ -1086,7 +1207,7 @@ class TextKeyboard(
     }
 
     internal fun markLayoutSignatureApplied() {
-        val currentIme = TextKeyboard.ime ?: return
+        val currentIme = layoutState.ime ?: return
         lastLayoutSignature = layoutSignature(currentIme)
     }
 
@@ -1098,7 +1219,7 @@ class TextKeyboard(
      */
     protected override fun currentLayoutSignature(): String {
         val json = textLayoutJson
-        val currentIme = ime
+        val currentIme = layoutState.ime
         val showLangSwitch = AppPrefs.getInstance().keyboard.showLangSwitchKey.getValue()
         val imeName = currentIme?.uniqueName
         val displayName = currentIme?.displayName
@@ -1384,6 +1505,15 @@ class TextKeyboard(
         updatePunctuationKeys()
     }
 
+    /** Aux bar config resolved by this keyboard's own last layout pass. */
+    internal val resolvedAuxBarConfig: AuxBarConfig?
+        get() = layoutState.auxBarConfig
+
+    /** Re-apply the space key label from this keyboard's own input method. */
+    private fun refreshSpaceLabelFromState() {
+        updateSpaceLabel(layoutState.ime)
+    }
+
     private fun updateSpaceLabel(ime: InputMethodEntry?) {
         if (ime == null) return
         val subModeText = ime.subMode.run { name.ifEmpty { label.ifEmpty { "" } } }
@@ -1410,8 +1540,10 @@ class TextKeyboard(
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
-        // update ime of companion object ime
-        TextKeyboard.ime = ime
+        // Keep the input method in this keyboard's own layout state; the companion mirror of
+        // the real input method is maintained by KeyboardWindow, so a settings preview can no
+        // longer repoint the real keyboard's layout resolution at its preview entry.
+        layoutState.ime = ime
         val signature = layoutSignature(ime)
         if (signature != lastLayoutSignature) {
             reloadLayout()
@@ -1428,7 +1560,7 @@ class TextKeyboard(
         updateCapsButtonIcon()
         updateAlphabetKeys()
         updatePunctuationKeys()
-        updateSpaceLabel(TextKeyboard.ime)
+        refreshSpaceLabelFromState()
     }
 
     override fun onThemeUpdate(newTheme: Theme) {

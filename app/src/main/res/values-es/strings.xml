@@ -419,6 +419,7 @@
     <string name="fontset_sample_candidate">Ejemplo de candidato</string>
     <string name="fontset_sample_popup">Tecla emergente</string>
     <string name="fontset_sample_preedit">Texto de preedición</string>
+    <string name="fontset_sample_comment">Ejemplo de comentario</string>
     <string name="picker_category_fullwidth">Ancho completo</string>
     <string name="macro_editor_key_event_unmatched">Inconsistencia de eventos de tecla: el número de eventos down y up para %1$s no coincide</string>
     <string name="text_keyboard_layout_qr_export">Compartir mediante imagen QR</string>
@@ -481,6 +482,8 @@
     <string name="build_time">Hora de compilacion</string>
     <string name="button_up_haptic_feedback">Respuesta haptica al soltar tecla</string>
     <string name="candidate_highlight_radius">Radio de resaltado del candidato</string>
+    <string name="highlight_first_candidate">Resaltar el primer candidato de forma predeterminada</string>
+    <string name="highlight_first_candidate_summary">Mostrar el fondo de resaltado en el primer candidato hasta que se mueva la selección</string>
     <string name="candidates_window">Ventana de candidatos</string>
     <string name="candidates_window_radius">Radio de la ventana de candidatos</string>
     <string name="cannot_resolve_popup_preset">No se pudo resolver el archivo de preajustes emergentes</string>
@@ -565,6 +568,7 @@
     <string name="fontset_entry_key_main">Fuente principal de tecla</string>
     <string name="fontset_entry_popup_key">Fuente de tecla emergente</string>
     <string name="fontset_entry_preedit">Fuente de preedicion</string>
+    <string name="fontset_entry_comment">Fuente de comentarios</string>
     <string name="fontset_saved_at">Guardado</string>
     <string name="grant_permission">Conceder permiso</string>
     <string name="hide_candidates_list">Ocultar lista de candidatos</string>

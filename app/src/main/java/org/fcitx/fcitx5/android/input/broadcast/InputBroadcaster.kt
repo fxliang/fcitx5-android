@@ -47,8 +47,8 @@ class InputBroadcaster : UniqueComponent<InputBroadcaster>(), Dependent, InputBr
         receivers.forEach { it.onInputPanelUpdate(data) }
     }
 
-    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
-        receivers.forEach { it.onStartInput(info, capFlags) }
+    override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean) {
+        receivers.forEach { it.onStartInput(info, capFlags, restarting) }
     }
 
     override fun onImeUpdate(ime: InputMethodEntry) {

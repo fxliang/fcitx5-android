@@ -3,13 +3,23 @@
  */
 package org.fcitx.fcitx5.android.input.font
 
+import android.content.Context
 import android.graphics.Typeface
 import org.fcitx.fcitx5.android.input.config.ConfigProviders
+import kotlin.math.roundToInt
 
 interface FontProviderApi {
     fun clearCache()
     val fontTypefaceMap: MutableMap<String, Typeface?>
     val fontSizeMap: MutableMap<String, Float>
+
+    /**
+     * Monotonic revision of the served custom-font data. It changes only when the
+     * resolved fonts actually change (not on every reload attempt), so callers can
+     * rebuild font-dependent views exactly once per real change.
+     */
+    val fontDataVersion: Long
+        get() = 0L
 
     fun resolveTypeface(key: String, current: Typeface? = null): Typeface {
         return fontTypefaceMap[key]
@@ -20,6 +30,19 @@ interface FontProviderApi {
 }
 
 object FontProviders {
+    /**
+     * Font key for the candidate comment (e.g. Zhuyin / shape-code breakdown).
+     * Comments are usually longer than the candidate text itself, so they get
+     * their own typeface and a smaller size (see [DEFAULT_COMMENT_FONT_SIZE]).
+     */
+    const val KEY_COMMENT_FONT = "comment_font"
+
+    /**
+     * Default comment font size in sp. Smaller than the candidate font size
+     * so long comments stay readable without dominating the candidate bar.
+     */
+    const val DEFAULT_COMMENT_FONT_SIZE = 14f
+
     @Volatile
     var provider: FontProviderApi = DefaultFontProvider()
         set(value) {
@@ -29,6 +52,7 @@ object FontProviders {
             }
         }
 
+    private val refreshLock = Any()
     @Volatile
     private var needsRefresh = false
     private val fontSizeResultCache = HashMap<String, Float>()
@@ -48,7 +72,9 @@ object FontProviders {
         synchronized(fontSizeResultCache) {
             fontSizeResultCache.clear()
         }
-        needsRefresh = true
+        synchronized(refreshLock) {
+            needsRefresh = true
+        }
     }
 
     /**
@@ -60,17 +86,19 @@ object FontProviders {
         synchronized(fontSizeResultCache) {
             fontSizeResultCache.clear()
         }
-        needsRefresh = true
+        synchronized(refreshLock) {
+            needsRefresh = true
+        }
     }
 
     /**
      * Check and clear refresh flag. Call when keyboard loads.
      * @return true if font changed and keyboard needs refresh
      */
-    fun checkAndClearRefreshFlag(): Boolean {
-        if (!needsRefresh) return false
+    fun checkAndClearRefreshFlag(): Boolean = synchronized(refreshLock) {
+        val result = needsRefresh
         needsRefresh = false
-        return true
+        result
     }
 
     fun clearCache() {
@@ -78,7 +106,9 @@ object FontProviders {
         synchronized(fontSizeResultCache) {
             fontSizeResultCache.clear()
         }
-        needsRefresh = true
+        synchronized(refreshLock) {
+            needsRefresh = true
+        }
     }
 
     val fontTypefaceMap: MutableMap<String, Typeface?>
@@ -86,6 +116,12 @@ object FontProviders {
 
     val fontSizeMap: MutableMap<String, Float>
         get() = provider.fontSizeMap
+
+    /**
+     * Revision of the currently served custom-font data; see [FontProviderApi.fontDataVersion].
+     */
+    val fontGeneration: Long
+        get() = provider.fontDataVersion
 
     /**
      * Get font size for a specific key with fallback logic.
@@ -113,7 +149,12 @@ object FontProviders {
             else -> default
         }
         synchronized(fontSizeResultCache) {
-            fontSizeResultCache[cacheKey] = resolved
+            // The default provider loads font sizes asynchronously. Do not retain a
+            // fallback calculated from its temporary empty map, or it can mask the
+            // configured value after preload completes.
+            if (sizeMap.isNotEmpty()) {
+                fontSizeResultCache[cacheKey] = resolved
+            }
         }
         return resolved
     }
@@ -127,6 +168,22 @@ object FontProviders {
     }
 
     /**
+     * Resolve the candidate comment typeface with the same fallback chain as
+     * [resolveTypeface] but starting from the dedicated comment font key:
+     * comment_font -> cand_font -> current -> system default.
+     */
+    fun resolveCommentTypeface(current: Typeface? = null): Typeface =
+        resolveTypeface(KEY_COMMENT_FONT, resolveTypeface("cand_font", current))
+
+    /**
+     * Candidate comment font size in pixels (sp * scaledDensity).
+     * See [DEFAULT_COMMENT_FONT_SIZE] for the default size in sp.
+     */
+    fun commentFontSizePx(context: Context): Int =
+        (getFontSize(KEY_COMMENT_FONT, DEFAULT_COMMENT_FONT_SIZE) *
+            context.resources.displayMetrics.scaledDensity).roundToInt()
+
+    /**
      * Returns true if current refresh flag is set, without consuming it.
      */
     fun needsRefresh(): Boolean = needsRefresh
@@ -135,11 +192,16 @@ object FontProviders {
      * Preload fonts asynchronously. Call this before keyboard is shown.
      */
     fun preloadFontsAsync(onComplete: ((MutableMap<String, Typeface?>) -> Unit)? = null) {
+        val completion: (MutableMap<String, Typeface?>) -> Unit = { fonts ->
+            synchronized(fontSizeResultCache) {
+                fontSizeResultCache.clear()
+            }
+            onComplete?.invoke(fonts)
+        }
         if (provider is DefaultFontProvider) {
-            (provider as DefaultFontProvider).preloadFontsAsync(onComplete)
+            (provider as DefaultFontProvider).preloadFontsAsync(completion)
         } else {
-            // For other providers, just return cached map immediately
-            onComplete?.invoke(fontTypefaceMap)
+            completion(fontTypefaceMap)
         }
     }
 

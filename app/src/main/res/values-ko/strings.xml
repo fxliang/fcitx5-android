@@ -390,6 +390,7 @@
     <string name="fontset_sample_candidate">후보 예시</string>
     <string name="fontset_sample_popup">팝업 키</string>
     <string name="fontset_sample_preedit">미리 편집 텍스트</string>
+    <string name="fontset_sample_comment">주석 예시</string>
     <string name="picker_category_fullwidth">전각</string>
     <string name="macro_editor_key_event_unmatched">키 이벤트 불일치: %1$s의 누름과 뗌 이벤트 수가 일치하지 않습니다</string>
     <string name="text_keyboard_layout_qr_export">QR 이미지로 공유</string>
@@ -456,6 +457,8 @@
     <string name="button_vibration_amplitude">키 진동 강도</string>
     <string name="button_vibration_milliseconds">키 진동 시간</string>
     <string name="candidate_highlight_radius">후보 강조 모서리 반경</string>
+    <string name="highlight_first_candidate">기본적으로 첫 번째 후보 강조</string>
+    <string name="highlight_first_candidate_summary">선택을 이동할 때까지 첫 번째 후보에 강조 배경을 표시</string>
     <string name="candidates_window">후보 창</string>
     <string name="candidates_window_radius">후보 창 모서리 반경</string>
     <string name="cannot_resolve_popup_preset">팝업 프리셋 파일을 찾을 수 없습니다</string>
@@ -549,6 +552,7 @@
     <string name="fontset_entry_key_main">주 키 글꼴</string>
     <string name="fontset_entry_popup_key">팝업 키 글꼴</string>
     <string name="fontset_entry_preedit">조합 글꼴</string>
+    <string name="fontset_entry_comment">주석 글꼴</string>
     <string name="fontset_saved_at">저장됨</string>
     <string name="grant_permission">권한 부여</string>
     <string name="hide_candidates_list">후보 목록 숨기기</string>

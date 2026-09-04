@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.dialog.AddMoreInputMethodsPrompt
@@ -120,6 +121,7 @@ sealed class ButtonAction {
             CursorMoveAction,
             FloatingToggleAction,
             ClipboardAction,
+            ThemeToggleAction,
             LanguageSwitchAction,
             ThemeAction,
             IconThemeAction,
@@ -153,7 +155,7 @@ sealed class ButtonAction {
             CursorMoveAction,
             FloatingToggleAction,
             ClipboardAction,
-            MoreAction
+            ThemeToggleAction
         )
 
         /**
@@ -303,6 +305,39 @@ data object MoreAction : ButtonAction() {
         onActionComplete: (() -> Unit)?
     ) {
         windowManager.attachWindow(StatusAreaWindow())
+    }
+}
+
+data object ThemeToggleAction : ButtonAction() {
+    override val id = "theme_toggle"
+    override val defaultIcon = R.drawable.ic_theme_light_dark_24
+    override val defaultLabelRes = R.string.toggle_day_night_theme
+    override val iconSlot = "toolbar.theme_toggle"
+
+    override fun isActive(service: FcitxInputMethodService): Boolean {
+        return ThemeManager.isUsingConfiguredDarkTheme()
+    }
+
+    override fun execute(
+        context: Context,
+        service: FcitxInputMethodService,
+        fcitx: FcitxConnection,
+        windowManager: InputWindowManager,
+        view: View?,
+        onActionComplete: (() -> Unit)?
+    ) {
+        ThemeManager.toggleConfiguredDayNightTheme()
+        onActionComplete?.invoke()
+    }
+
+    override fun onLongPress(
+        context: Context,
+        service: FcitxInputMethodService,
+        fcitx: FcitxConnection,
+        windowManager: InputWindowManager,
+        view: View
+    ) {
+        AppUtil.launchMainToThemeList(context)
     }
 }
 

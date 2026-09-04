@@ -18,12 +18,16 @@ import org.fcitx.fcitx5.android.input.font.FontProviders
 open class PagingCandidateViewAdapter(val theme: Theme) :
     PagingDataAdapter<CandidateWord, CandidateViewHolder>(diffCallback) {
 
-    // Cache candidate font and refresh only when font configuration changes.
+    // Cache candidate/comment fonts and refresh only when font configuration changes.
     private var candFont: Typeface? = FontProviders.resolveTypeface("cand_font", null)
+    private var commentFont: Typeface? = resolveCommentFont()
+
+    private fun resolveCommentFont(): Typeface? = FontProviders.resolveCommentTypeface(null)
 
     private fun refreshCandidateFontIfNeeded() {
         if (FontProviders.needsRefresh()) {
             candFont = FontProviders.resolveTypeface("cand_font", null)
+            commentFont = resolveCommentFont()
         }
     }
 
@@ -48,13 +52,14 @@ open class PagingCandidateViewAdapter(val theme: Theme) :
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
-        val ui = CandidateItemUi(parent.context, theme, candFont)
+        val ui = CandidateItemUi(parent.context, theme, candFont, commentFont)
         return CandidateViewHolder(ui)
     }
 
     override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
         refreshCandidateFontIfNeeded()
         holder.ui.applyConfiguredTypeface(candFont)
+        holder.ui.applyConfiguredCommentTypeface(commentFont)
         val candidate = getItem(position) ?: CandidateWord.Empty
         holder.update(position + offset, candidate)
     }

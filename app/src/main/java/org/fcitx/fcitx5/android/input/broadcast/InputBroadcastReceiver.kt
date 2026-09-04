@@ -20,7 +20,7 @@ interface InputBroadcastReceiver {
 
     fun onScopeSetupFinished(scope: DynamicScope) {}
 
-    fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {}
+    fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean) {}
 
     fun onClientPreeditUpdate(data: FormattedText) {}
 

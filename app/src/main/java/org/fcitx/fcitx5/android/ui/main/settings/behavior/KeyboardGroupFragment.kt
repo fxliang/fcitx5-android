@@ -6,10 +6,15 @@ package org.fcitx.fcitx5.android.ui.main.settings.behavior
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
@@ -19,6 +24,8 @@ import org.fcitx.fcitx5.android.input.config.UserConfigFiles
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.data.LayoutDataManager
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.webeditor.ImeWebEditorBridgeServer
+import org.fcitx.fcitx5.android.utils.queryFileName
+import org.fcitx.fcitx5.android.utils.toast
 
 /**
  * Sub-fragment showing only the preferences belonging to one keyboard settings group.
@@ -34,6 +41,14 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
     private var textLayoutFileSelectPreference: Preference? = null
     private var webEditorBridgePreference: Preference? = null
     private var numericLayoutOverridePreference: Preference? = null
+    private var customKeySoundPreference: Preference? = null
+
+    private val customKeySoundLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@registerForActivityResult
+        importKeySound(uri)
+    }
     private data class LayoutLayerCache(
         val path: String?,
         val lastModified: Long,
@@ -110,6 +125,16 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
             ) { toggleWebEditorBridge() }
         }
 
+        // Group 2 extras: imported sound files used for all keys
+        if (group == GROUP_FEEDBACK) {
+            customKeySoundPreference = addTool(
+                screen,
+                AppPrefs.getInstance().keyboard.customKeySound.key,
+                R.string.custom_key_sound,
+                buildCustomKeySoundSummary()
+            ) { showCustomKeySoundDialog() }
+        }
+
         // Group 3 extras: edit buttons (toolbar customization)
         if (group == GROUP_TOOLBAR) {
             addTool(screen, "tool_edit_buttons",
@@ -121,6 +146,9 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
     override fun onResume() {
         super.onResume()
         viewModel.setToolbarTitle(getString(groupTitleRes(group)))
+        if (group == GROUP_FEEDBACK) {
+            customKeySoundPreference?.summary = buildCustomKeySoundSummary()
+        }
         if (group == GROUP_EDITORS) {
             textLayoutFileSelectPreference?.summary = buildCurrentTextLayoutFileSummary()
             numericLayoutOverridePreference?.summary = buildNumericLayoutOverrideSummary()
@@ -154,6 +182,61 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
         screen: PreferenceScreen, key: String, titleRes: Int, summaryRes: Int,
         onClick: () -> Unit
     ): Preference = addTool(screen, key, titleRes, getString(summaryRes), onClick)
+
+    private fun buildCustomKeySoundSummary(): String {
+        val selected = AppPrefs.getInstance().keyboard.customKeySound.getValue()
+        return selected.ifBlank { getString(R.string.custom_key_sound_system_default) }
+    }
+
+    private fun showCustomKeySoundDialog() {
+        val files = UserConfigFiles.listKeySoundFiles()
+        val items = listOf(getString(R.string.custom_key_sound_system_default)) + files
+        val selected = AppPrefs.getInstance().keyboard.customKeySound.getValue()
+        val checked = if (selected.isBlank()) 0 else (files.indexOf(selected) + 1).coerceAtLeast(0)
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.custom_key_sound)
+            .setSingleChoiceItems(items.toTypedArray(), checked) { dialog, which ->
+                AppPrefs.getInstance().keyboard.customKeySound.setValue(
+                    if (which == 0) "" else files[which - 1]
+                )
+                customKeySoundPreference?.summary = buildCustomKeySoundSummary()
+                dialog.dismiss()
+            }
+            .setNeutralButton(R.string.custom_key_sound_import) { _, _ ->
+                customKeySoundLauncher.launch(arrayOf("audio/*"))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun importKeySound(uri: Uri) {
+        val resolver = requireContext().contentResolver
+        val sourceName = resolver.queryFileName(uri).orEmpty()
+        val safeName = sourceName
+            .replace(Regex("[^A-Za-z0-9._ -]"), "_")
+            .trim()
+        val target = UserConfigFiles.keySoundFile(safeName)
+        if (target == null || safeName.isBlank()) {
+            requireContext().toast(R.string.custom_key_sound_invalid)
+            return
+        }
+        lifecycleScope.launch {
+            val imported = withContext(Dispatchers.IO) {
+                runCatching {
+                    target.parentFile?.mkdirs()
+                    resolver.openInputStream(uri)?.use { input ->
+                        target.outputStream().use { output -> input.copyTo(output) }
+                    } ?: error("Unable to open audio file")
+                }.isSuccess
+            }
+            if (imported) {
+                AppPrefs.getInstance().keyboard.customKeySound.setValue(target.name)
+                customKeySoundPreference?.summary = buildCustomKeySoundSummary()
+            } else {
+                requireContext().toast(R.string.custom_key_sound_invalid)
+            }
+        }
+    }
 
     private fun buildCurrentTextLayoutFileSummary() = getString(
         R.string.text_keyboard_layout_file_select_summary,
@@ -319,12 +402,13 @@ class KeyboardGroupFragment : ManagedPreferenceFragment(AppPrefs.getInstance().k
             GROUP_FEEDBACK to setOf(
                 "haptic_on_keypress", "haptic_on_keyup", "haptic_on_repeat",
                 "button_vibration_press_milliseconds", "button_vibration_press_amplitude",
-                "sound_on_keypress", "button_sound_volume"
+                "sound_on_keypress", "button_sound_volume", "custom_key_sound"
             ),
             GROUP_TOOLBAR to setOf(
                 "expand_toolbar_by_default", "toolbar_manually_toggled",
                 "inline_suggestions", "toolbar_num_row_on_password",
-                "horizontal_candidate_style", "expanded_candidate_style",
+                "horizontal_candidate_style", "highlight_first_candidate",
+                "expanded_candidate_style",
                 "expanded_candidate_grid_span_count_portrait",
                 "show_voice_input_button", "preferred_voice_input",
             ),
